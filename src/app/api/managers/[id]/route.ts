@@ -9,7 +9,7 @@ export function PUT(request: Request, ctx: RouteContext<"/api/managers/[id]">) {
   return handle(async () => {
     const id = parseId((await ctx.params).id);
     const input = await parseBody(request, managerInput);
-    const updated = updateManager(id, input);
+    const updated = await updateManager(id, input);
     if (!updated) notFound();
     return NextResponse.json(updated);
   });
@@ -18,13 +18,13 @@ export function PUT(request: Request, ctx: RouteContext<"/api/managers/[id]">) {
 export function DELETE(_request: Request, ctx: RouteContext<"/api/managers/[id]">) {
   return handle(async () => {
     const id = parseId((await ctx.params).id);
-    if (managerInUse(id)) {
+    if (await managerInUse(id)) {
       throw NextResponse.json(
         { error: "Нельзя удалить менеджера: есть связанные долги" },
         { status: 409 },
       );
     }
-    if (!deleteManager(id)) notFound();
+    if (!(await deleteManager(id))) notFound();
     return NextResponse.json({ ok: true });
   });
 }

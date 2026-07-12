@@ -74,31 +74,27 @@ async function migrate(db: Client) {
     { backfillFromId: false },
   );
   // Дата долга: существующие строки получают дату создания записи.
-  ensureColumn(db, "debts", "date", "TEXT", { backfillFromId: false });
-  db.exec("UPDATE debts SET date = date(created_at) WHERE date IS NULL");
-  // Справочник менеджеров: таблицу managers создаёт schema.sql до migrate().
+  await ensureColumn(db, "debts", "date", "TEXT", { backfillFromId: false });
+  await db.execute("UPDATE debts SET date = date(created_at) WHERE date IS NULL");
+  // Справочник менеджеров: таблицу managers создаёт SCHEMA (initSchema) до migrate().
   // Колонку manager_id добавляем с column-level FK (SQLite это разрешает при
   // ADD COLUMN, если дефолт колонки NULL) — enforcement одинаков со свежими БД.
-  // Всё в одной транзакции: проверка наличия старой колонки и её удаление
-  // атомарны, поэтому параллельные процессы (воркеры сборки) не ловят
-  // «no such column: manager» из-за гонки check-then-drop.
-  db.transaction(() => {
-    ensureColumn(db, "debts", "manager_id", "INTEGER REFERENCES managers(id) ON DELETE RESTRICT", {
-      backfillFromId: false,
-    });
-    if (hasColumn(db, "debts", "manager")) {
-      // По одному менеджеру на каждое уникальное непустое имя из старых долгов.
-      db.exec(
-        "INSERT INTO managers (name) SELECT DISTINCT trim(manager) FROM debts d " +
-          "WHERE trim(manager) <> '' AND NOT EXISTS (SELECT 1 FROM managers m WHERE m.name = trim(d.manager))",
-      );
-      db.exec(
-        "UPDATE debts SET manager_id = (SELECT m.id FROM managers m WHERE m.name = trim(debts.manager)) " +
-          "WHERE manager_id IS NULL AND trim(manager) <> ''",
-      );
-      dropColumn(db, "debts", "manager"); // старая текстовая колонка больше не нужна
-    }
-  })();
+  // Гонок нет: инициализация выполняется один раз (промис мемоизирован на globalThis).
+  await ensureColumn(db, "debts", "manager_id", "INTEGER REFERENCES managers(id) ON DELETE RESTRICT", {
+    backfillFromId: false,
+  });
+  if ((await columnNames(db, "debts")).has("manager")) {
+    // По одному менеджеру на каждое уникальное непустое имя из старых долгов.
+    await db.execute(
+      "INSERT INTO managers (name) SELECT DISTINCT trim(manager) FROM debts d " +
+        "WHERE trim(manager) <> '' AND NOT EXISTS (SELECT 1 FROM managers m WHERE m.name = trim(d.manager))",
+    );
+    await db.execute(
+      "UPDATE debts SET manager_id = (SELECT m.id FROM managers m WHERE m.name = trim(debts.manager)) " +
+        "WHERE manager_id IS NULL AND trim(manager) <> ''",
+    );
+    await dropColumn(db, "debts", "manager"); // старая текстовая колонка больше не нужна
+  }
 }
 
 async function columnNames(db: Client, table: string): Promise<Set<string>> {
@@ -109,8 +105,6 @@ async function columnNames(db: Client, table: string): Promise<Set<string>> {
 async function dropColumn(db: Client, table: string, column: string) {
   if ((await columnNames(db, table)).has(column)) {
     await db.execute(`ALTER TABLE ${table} DROP COLUMN ${column}`);
-  }
-}
   }
 }
 
@@ -157,10 +151,19 @@ CREATE TABLE IF NOT EXISTS placements (
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS managers (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT    NOT NULL,
+  telegram   TEXT,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS debts (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  manager      TEXT    NOT NULL,
+  manager_id   INTEGER,
   amount       INTEGER NOT NULL DEFAULT 0,
+  date         TEXT    NOT NULL DEFAULT (date('now')),
   service      TEXT    CHECK (service IS NULL OR service IN ('Lets','Mate','N-Obmen','Currex')),
   placement_id INTEGER,
   source_text  TEXT,
@@ -168,6 +171,7 @@ CREATE TABLE IF NOT EXISTS debts (
   sort_order   INTEGER NOT NULL DEFAULT 0,
   created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (placement_id) REFERENCES placements(id) ON DELETE SET NULL
+  FOREIGN KEY (placement_id) REFERENCES placements(id) ON DELETE SET NULL,
+  FOREIGN KEY (manager_id) REFERENCES managers(id) ON DELETE RESTRICT
 );
 `;
