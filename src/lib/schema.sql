@@ -24,9 +24,17 @@ CREATE TABLE IF NOT EXISTS placements (
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS managers (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT    NOT NULL,               -- имя
+  telegram   TEXT,                           -- ник телеграм (необязательно)
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS debts (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  manager      TEXT    NOT NULL,             -- менеджер
+  manager_id   INTEGER,                      -- менеджер (FK -> managers)
   amount       INTEGER NOT NULL DEFAULT 0,   -- сумма (micro-USDT)
   date         TEXT    NOT NULL DEFAULT (date('now')), -- дата долга (YYYY-MM-DD)
   service      TEXT    CHECK (service IS NULL OR service IN ('Lets','Mate','N-Obmen','Currex')), -- необязательно
@@ -36,5 +44,6 @@ CREATE TABLE IF NOT EXISTS debts (
   sort_order   INTEGER NOT NULL DEFAULT 0,   -- ручной порядок строк
   created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (placement_id) REFERENCES placements(id) ON DELETE SET NULL
+  FOREIGN KEY (placement_id) REFERENCES placements(id) ON DELETE SET NULL,
+  FOREIGN KEY (manager_id) REFERENCES managers(id) ON DELETE RESTRICT
 );

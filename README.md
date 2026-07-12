@@ -6,7 +6,8 @@
 
 - **Средства** — из чего состоит депо (название, сумма).
 - **Размещение** — где средства находятся сейчас: внешний кошелёк (адрес) или биржа (KuCoin/Bitget, спотовый или основной счёт), плюс название, сумма, место, комментарий.
-- **Долги** — кто и сколько взял из депо (менеджер, сумма, сервис, откуда взял, комментарий).
+- **Долги** — кто и сколько взял из депо (менеджер из справочника, дата, сумма, сервис, откуда взял, комментарий).
+- **Менеджеры** — справочник (имя, ник телеграм) для выбора в долгах вместо ввода текстом; кнопка «Менеджеры» в блоке «Долги» открывает форму управления списком.
 - **Дашборд со сверкой** — всего в депо / размещено / выдано в долг / сверка: **размещено + долги = депо**. Избыток (больше депо) — зелёный, недостача (меньше депо) — красный.
 - **Авторизация** — вход по паролю (`APP_PASSWORD` в `.env`, плюс `AUTH_SECRET` для подписи сессий). Сессия — httpOnly-cookie на 30 дней, все страницы и API закрыты через `src/proxy.ts`. Смена пароля разлогинивает все сессии.
 - **Проверка балансов из сети TRON** — кнопка «Проверить балансы» в блоке «Размещение» запрашивает USDT (TRC-20) по адресам строк через TronGrid и перезаписывает суммы. Время последнего обновления — в подсказке на сумме. Опционально `TRONGRID_API_KEY` в env, чтобы не упираться в публичный rate limit.
@@ -42,14 +43,15 @@ npm run start
 | Таблица      | Поля                                                                 |
 | ------------ | ------------------------------------------------------------------- |
 | `funds`      | name, amount                                                        |
+| `managers`   | name, telegram (nullable)                                           |
 | `placements` | name, amount, kind (wallet/exchange), place, address (для wallet), exchange (KuCoin/Bitget, для exchange), exchange_account (spot/main), comment |
-| `debts`      | manager, amount, date (YYYY-MM-DD), service (nullable: Lets/Mate/N-Obmen/Currex), placement_id (FK → placements, `ON DELETE SET NULL`), source_text, comment |
+| `debts`      | manager_id (FK → managers, `ON DELETE RESTRICT`), amount, date (YYYY-MM-DD), service (nullable: Lets/Mate/N-Obmen/Currex), placement_id (FK → placements, `ON DELETE SET NULL`), source_text, comment |
 
 «Откуда взял» в долгах — либо ссылка на размещение (выпадающий список), либо свободный текст.
 
 ## API
 
-REST под `/api`: `funds`, `placements`, `debts` (CRUD: GET/POST/PUT/DELETE) и `summary` (GET, сводка со сверкой).
+REST под `/api`: `funds`, `managers`, `placements`, `debts` (CRUD: GET/POST/PUT/DELETE) и `summary` (GET, сводка со сверкой).
 
 ## Структура
 

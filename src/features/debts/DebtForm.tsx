@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePlacements } from "@/hooks/usePlacements";
+import { useManagers } from "@/hooks/useManagers";
 import { useCreateDebt, useUpdateDebt } from "@/hooks/useDebts";
 import { formatDate } from "@/lib/format";
 import { SERVICES, type Debt, type Service } from "@/types";
@@ -42,9 +43,8 @@ function toYmd(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// Валидируются только текстовые поля; сервис и источник — через локальное состояние.
+// Валидируются только текстовые поля; менеджер, сервис и источник — через локальное состояние.
 const formSchema = z.object({
-  manager: z.string().trim().min(1, "Укажите менеджера"),
   amount: z.number({ message: "Укажите сумму" }).min(0, "Сумма не может быть отрицательной"),
   source_text: z.string().trim().optional(),
   comment: z.string().trim().optional(),
@@ -55,12 +55,16 @@ type SourceKind = "none" | "placement" | "text";
 
 export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) {
   const { data: placements = [] } = usePlacements();
+  const { data: managers = [] } = useManagers();
   const create = useCreateDebt();
   const update = useUpdateDebt();
 
   // По умолчанию — сегодняшняя дата.
   const [date, setDate] = useState<Date>(() => (debt?.date ? parseYmd(debt.date) : new Date()));
   const [dateOpen, setDateOpen] = useState(false);
+  const [managerId, setManagerId] = useState<string>(
+    debt?.manager_id ? String(debt.manager_id) : "",
+  );
   const [service, setService] = useState<Service | "">(debt?.service ?? "");
   const [sourceKind, setSourceKind] = useState<SourceKind>(
     debt?.placement_id ? "placement" : debt?.source_text ? "text" : "none",
@@ -76,7 +80,6 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      manager: debt?.manager ?? "",
       amount: debt?.amount ?? 0,
       source_text: debt?.source_text ?? "",
       comment: debt?.comment ?? "",
@@ -97,8 +100,12 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
   }
 
   async function onSubmit(values: FormValues) {
+    if (!managerId) {
+      toast.error("Выберите менеджера");
+      return;
+    }
     const input: DebtInput = {
-      manager: values.manager,
+      manager_id: Number(managerId),
       amount: values.amount,
       date: toYmd(date),
       service: service || null,
@@ -120,9 +127,24 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="d-manager">Менеджер</Label>
-          <Input id="d-manager" placeholder="Кто взял" {...register("manager")} />
-          {errors.manager && <p className="text-sm text-destructive">{errors.manager.message}</p>}
+          <Label>Менеджер</Label>
+          <Select value={managerId} onValueChange={setManagerId}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Выберите менеджера" />
+            </SelectTrigger>
+            <SelectContent>
+              {managers.map((m) => (
+                <SelectItem key={m.id} value={String(m.id)}>
+                  {m.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {managers.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Нет менеджеров. Добавьте через кнопку «Менеджеры».
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="d-amount">Сумма, USDT</Label>

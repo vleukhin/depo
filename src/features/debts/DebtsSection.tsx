@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,6 +25,7 @@ import { formatDate, formatUsdt } from "@/lib/format";
 import { useDebts, useDeleteDebt, useReorderDebts } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
 import { DebtForm } from "./DebtForm";
+import { ManagersDialog } from "@/features/managers/ManagersDialog";
 
 function sourceLabel(debt: Debt): string {
   if (debt.placement_name) return debt.placement_name;
@@ -37,6 +38,7 @@ export function DebtsSection() {
   const del = useDeleteDebt();
   const reorder = useReorderDebts();
   const [open, setOpen] = useState(false);
+  const [managersOpen, setManagersOpen] = useState(false);
   const [editing, setEditing] = useState<Debt | undefined>(undefined);
 
   function openCreate() {
@@ -54,6 +56,12 @@ export function DebtsSection() {
       title="Долги"
       description="Кто и сколько взял из депо"
       onAdd={openCreate}
+      actions={
+        <Button size="sm" variant="outline" onClick={() => setManagersOpen(true)}>
+          <Users className="size-4" />
+          Менеджеры
+        </Button>
+      }
     >
       <div className="overflow-x-auto">
         <SortableRows ids={debts.map((d) => d.id)} onReorder={(ids) => reorder.mutate(ids)}>
@@ -73,7 +81,7 @@ export function DebtsSection() {
             <TableBody>
               {debts.map((debt) => (
                 <SortableRow key={debt.id} id={debt.id}>
-                  <TableCell className="font-medium">{debt.manager}</TableCell>
+                  <TableCell className="font-medium">{debt.manager_name ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
                     {formatDate(debt.date)}
                   </TableCell>
@@ -124,6 +132,8 @@ export function DebtsSection() {
           <DebtForm debt={editing} onDone={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      <ManagersDialog open={managersOpen} onOpenChange={setManagersOpen} />
     </SectionCard>
   );
 }
