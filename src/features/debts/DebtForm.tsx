@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UsdtIcon } from "@/components/UsdtAmount";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
@@ -104,7 +105,9 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
           {errors.manager && <p className="text-sm text-destructive">{errors.manager.message}</p>}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="d-amount">Сумма, USDT</Label>
+          <Label htmlFor="d-amount" className="gap-1">
+            Сумма, <UsdtIcon className="size-3.5" />
+          </Label>
           <Input
             id="d-amount"
             type="number"

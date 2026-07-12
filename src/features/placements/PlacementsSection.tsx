@@ -21,7 +21,7 @@ import {
 import { SectionCard } from "@/components/SectionCard";
 import { DeleteButton } from "@/components/DeleteButton";
 import { SortableRow, SortableRows } from "@/components/SortableRows";
-import { formatUsdt } from "@/lib/format";
+import { UsdtAmount } from "@/components/UsdtAmount";
 import { isTronAddress } from "@/lib/tron";
 import {
   useCheckBalances,
@@ -125,14 +125,14 @@ export function PlacementsSection() {
                 <SortableRow key={p.id} id={p.id}>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell
-                    className="text-right tabular-nums"
+                    className="text-right"
                     title={
                       p.chain_checked_at
                         ? `Обновлено автоматически: ${p.chain_checked_at} UTC`
                         : undefined
                     }
                   >
-                    {formatUsdt(p.amount)}
+                    <UsdtAmount value={p.amount} />
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground max-w-40">
                     {p.kind === "exchange" && p.exchange && p.exchange_account ? (

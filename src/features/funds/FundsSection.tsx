@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { SectionCard } from "@/components/SectionCard";
 import { DeleteButton } from "@/components/DeleteButton";
-import { formatUsdt } from "@/lib/format";
+import { UsdtAmount } from "@/components/UsdtAmount";
 import { useDeleteFund, useFunds } from "@/hooks/useFunds";
 import type { Fund } from "@/types";
 import { FundForm } from "./FundForm";
@@ -58,7 +58,9 @@ export function FundsSection() {
           {funds.map((fund) => (
             <TableRow key={fund.id}>
               <TableCell className="font-medium">{fund.name}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatUsdt(fund.amount)}</TableCell>
+              <TableCell className="text-right">
+                <UsdtAmount value={fund.amount} />
+              </TableCell>
               <TableCell className="text-right">
                 <Button
                   variant="ghost"

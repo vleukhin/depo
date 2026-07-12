@@ -3,7 +3,7 @@
 import { Wallet, MapPin, HandCoins, Scale } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { formatUsdt, formatUsdtSigned } from "@/lib/format";
+import { UsdtAmount } from "@/components/UsdtAmount";
 import { useSummary } from "@/hooks/useSummary";
 
 function StatCard({
@@ -15,7 +15,7 @@ function StatCard({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: React.ReactNode;
   hint?: string;
   tone?: "default" | "ok" | "bad";
 }) {
@@ -76,22 +76,22 @@ export function DashboardCards() {
       <StatCard
         icon={<Wallet className="size-5" />}
         label="Всего в депо"
-        value={formatUsdt(funds)}
+        value={<UsdtAmount value={funds} />}
       />
       <StatCard
         icon={<MapPin className="size-5" />}
         label="Размещено"
-        value={formatUsdt(placed)}
+        value={<UsdtAmount value={placed} />}
       />
       <StatCard
         icon={<HandCoins className="size-5" />}
         label="Выдано в долг"
-        value={formatUsdt(debts)}
+        value={<UsdtAmount value={debts} />}
       />
       <StatCard
         icon={<Scale className="size-5" />}
         label="Сверка (размещено + долги)"
-        value={balanced ? "Сходится" : formatUsdtSigned(diff)}
+        value={balanced ? "Сходится" : <UsdtAmount value={diff} signed />}
         hint={
           balanced
             ? "Размещено + долги = депо"

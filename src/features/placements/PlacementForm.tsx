@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UsdtIcon } from "@/components/UsdtAmount";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
@@ -95,7 +96,9 @@ export function PlacementForm({
           {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="p-amount">Сумма, USDT</Label>
+          <Label htmlFor="p-amount" className="gap-1">
+            Сумма, <UsdtIcon className="size-3.5" />
+          </Label>
           <Input
             id="p-amount"
             type="number"

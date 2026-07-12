@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UsdtIcon } from "@/components/UsdtAmount";
 import { DialogFooter } from "@/components/ui/dialog";
 import { fundInput, type FundFormValues, type FundInput } from "@/lib/validate";
 import { useCreateFund, useUpdateFund } from "@/hooks/useFunds";
@@ -44,7 +45,9 @@ export function FundForm({ fund, onDone }: { fund?: Fund; onDone: () => void }) 
         {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="amount">Сумма, USDT</Label>
+        <Label htmlFor="amount" className="gap-1">
+          Сумма, <UsdtIcon className="size-3.5" />
+        </Label>
         <Input
           id="amount"
           type="number"

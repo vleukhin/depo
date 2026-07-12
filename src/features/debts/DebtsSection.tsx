@@ -21,7 +21,7 @@ import {
 import { SectionCard } from "@/components/SectionCard";
 import { DeleteButton } from "@/components/DeleteButton";
 import { SortableRow, SortableRows } from "@/components/SortableRows";
-import { formatUsdt } from "@/lib/format";
+import { UsdtAmount } from "@/components/UsdtAmount";
 import { useDebts, useDeleteDebt, useReorderDebts } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
 import { DebtForm } from "./DebtForm";
@@ -73,8 +73,8 @@ export function DebtsSection() {
               {debts.map((debt) => (
                 <SortableRow key={debt.id} id={debt.id}>
                   <TableCell className="font-medium">{debt.manager}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatUsdt(debt.amount)}
+                  <TableCell className="text-right">
+                    <UsdtAmount value={debt.amount} />
                   </TableCell>
                   <TableCell>
                     {debt.service ? (
