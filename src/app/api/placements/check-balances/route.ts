@@ -3,35 +3,47 @@ import { handle } from "@/lib/api-helpers";
 import {
   listExchangePlacements,
   listPlacementsWithAddress,
-  updateAmountFromChain,
+  updateBalancesFromChain,
 } from "@/lib/repo";
-import { fetchUsdtBalance, isTronAddress } from "@/lib/tron";
-import { fetchUsdtBalanceMicro as fetchKucoinBalance } from "@/lib/kucoin";
-import { fetchUsdtBalanceMicro as fetchBitgetBalance } from "@/lib/bitget";
+import { fetchTrxBalance, fetchUsdtBalance, isTronAddress } from "@/lib/tron";
+import {
+  fetchTrxBalanceMicro as fetchKucoinTrx,
+  fetchUsdtBalanceMicro as fetchKucoinUsdt,
+} from "@/lib/kucoin";
+import {
+  fetchTrxBalanceMicro as fetchBitgetTrx,
+  fetchUsdtBalanceMicro as fetchBitgetUsdt,
+} from "@/lib/bitget";
 import type { CheckBalancesResult, Exchange, ExchangeAccount } from "@/types";
 
 export const runtime = "nodejs";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const EXCHANGE_FETCHERS: Record<Exchange, (account: ExchangeAccount) => Promise<number>> = {
-  KuCoin: fetchKucoinBalance,
-  Bitget: fetchBitgetBalance,
+type ExchangeFetcher = (account: ExchangeAccount) => Promise<number>;
+const USDT_FETCHERS: Record<Exchange, ExchangeFetcher> = {
+  KuCoin: fetchKucoinUsdt,
+  Bitget: fetchBitgetUsdt,
+};
+const TRX_FETCHERS: Record<Exchange, ExchangeFetcher> = {
+  KuCoin: fetchKucoinTrx,
+  Bitget: fetchBitgetTrx,
 };
 
 export function POST() {
   return handle(async () => {
     const result: CheckBalancesResult = { checked: 0, failed: [], skipped: 0 };
 
-    // Кошельки: баланс USDT (TRC-20) по адресу через TronGrid.
+    // Кошельки: балансы USDT (TRC-20) и нативного TRX по адресу через TronGrid.
     for (const { id, name, address } of await listPlacementsWithAddress()) {
       if (!isTronAddress(address)) {
         result.skipped++;
         continue;
       }
       try {
-        const micro = await fetchUsdtBalance(address);
-        await updateAmountFromChain(id, micro);
+        const usdt = await fetchUsdtBalance(address);
+        const trx = await fetchTrxBalance(address);
+        await updateBalancesFromChain(id, usdt, trx);
         result.checked++;
       } catch (err) {
         result.failed.push({
@@ -44,11 +56,12 @@ export function POST() {
       await sleep(process.env.TRONGRID_API_KEY ? 100 : 600);
     }
 
-    // Биржи: баланс USDT на счёте через приватный API (KuCoin/Bitget).
+    // Биржи: балансы USDT и TRX на счёте через приватный API (KuCoin/Bitget).
     for (const { id, name, exchange, exchange_account } of await listExchangePlacements()) {
       try {
-        const micro = await EXCHANGE_FETCHERS[exchange](exchange_account);
-        await updateAmountFromChain(id, micro);
+        const usdt = await USDT_FETCHERS[exchange](exchange_account);
+        const trx = await TRX_FETCHERS[exchange](exchange_account);
+        await updateBalancesFromChain(id, usdt, trx);
         result.checked++;
       } catch (err) {
         result.failed.push({

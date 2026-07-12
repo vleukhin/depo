@@ -29,6 +29,7 @@ export interface Placement {
   exchange_account: ExchangeAccount | null; // тип счёта на бирже
   comment: string | null;
   chain_checked_at: string | null; // когда сумма обновлялась из сети/с биржи, NULL — никогда
+  trx_amount: number | null; // баланс нативного TRX (в TRX), NULL — не проверяли
   created_at: string;
   updated_at: string;
 }

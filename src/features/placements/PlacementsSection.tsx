@@ -22,6 +22,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { DeleteButton } from "@/components/DeleteButton";
 import { SortableRow, SortableRows } from "@/components/SortableRows";
 import { UsdtAmount } from "@/components/UsdtAmount";
+import { TrxAmount } from "@/components/TrxAmount";
 import { isTronAddress } from "@/lib/tron";
 import {
   useCheckBalances,
@@ -115,6 +116,7 @@ export function PlacementsSection() {
                 <TableHead className="w-8" />
                 <TableHead>Название</TableHead>
                 <TableHead className="text-right">Сумма</TableHead>
+                <TableHead className="text-right">TRX</TableHead>
                 <TableHead>Адрес / счёт</TableHead>
                 <TableHead>Комментарий</TableHead>
                 <TableHead className="w-24" />
@@ -133,6 +135,16 @@ export function PlacementsSection() {
                     }
                   >
                     <UsdtAmount value={p.amount} />
+                  </TableCell>
+                  <TableCell
+                    className="text-right tabular-nums text-muted-foreground"
+                    title={
+                      p.chain_checked_at
+                        ? `Обновлено автоматически: ${p.chain_checked_at} UTC`
+                        : undefined
+                    }
+                  >
+                    {p.trx_amount != null ? <TrxAmount value={p.trx_amount} /> : "—"}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground max-w-40">
                     {p.kind === "exchange" && p.exchange && p.exchange_account ? (
@@ -164,7 +176,7 @@ export function PlacementsSection() {
               ))}
               {!isLoading && placements.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     Пока нет записей
                   </TableCell>
                 </TableRow>

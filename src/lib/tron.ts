@@ -117,3 +117,59 @@ export async function fetchUsdtBalance(address: string): Promise<number> {
   }
   return Number(micro);
 }
+
+interface GetAccountResponse {
+  // Нативный баланс TRX в SUN. Для неактивированного аккаунта TronGrid
+  // отдаёт пустой объект {}, поэтому поле необязательное.
+  balance?: number | string;
+}
+
+/**
+ * Баланс нативного TRX адреса в micro-единицах (SUN): у TRX 6 знаков,
+ * 1 TRX = 1 000 000 SUN — совпадает с нашим хранением, поэтому возвращаем
+ * целое число SUN как есть, без деления.
+ *
+ * В отличие от USDT нативный баланс читается из самого аккаунта
+ * (POST /wallet/getaccount, поле `balance` в SUN), а не через контракт.
+ * Для неактивированного/несуществующего адреса TronGrid возвращает пустой
+ * объект {} без поля balance — это корректно означает 0 TRX. На 429 —
+ * до 3 повторов с растущей паузой.
+ */
+export async function fetchTrxBalance(address: string): Promise<number> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (process.env.TRONGRID_API_KEY) {
+    headers["TRON-PRO-API-KEY"] = process.env.TRONGRID_API_KEY;
+  }
+
+  const body = JSON.stringify({ address: address.trim(), visible: true });
+
+  let res: Response;
+  let attempt = 0;
+  for (;;) {
+    res = await fetch("https://api.trongrid.io/wallet/getaccount", {
+      method: "POST",
+      headers,
+      body,
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    if (res.status !== 429 || attempt >= 3) break;
+    attempt++;
+    await sleep(1000 * attempt); // 1с, 2с, 3с
+  }
+  if (!res.ok) {
+    throw new Error(`TronGrid: HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as GetAccountResponse;
+  // Неактивированный адрес -> пустой объект {} без balance -> 0 TRX.
+  if (data.balance === undefined || data.balance === null) {
+    return 0;
+  }
+
+  const sun = BigInt(data.balance);
+  if (sun > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("TronGrid: баланс превышает безопасный диапазон");
+  }
+  return Number(sun);
+}

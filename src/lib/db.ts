@@ -45,6 +45,8 @@ async function migrate(db: Client) {
   await ensureColumn(db, "placements", "sort_order", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(db, "debts", "sort_order", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(db, "placements", "chain_checked_at", "TEXT", { backfillFromId: false });
+  // Баланс нативного TRX (SUN = micro-TRX), NULL — ещё не проверяли.
+  await ensureColumn(db, "placements", "trx_amount", "INTEGER", { backfillFromId: false });
   await dropColumn(db, "placements", "chain_balance"); // колонка из ранней версии, сумма пишется в amount
   await dropColumn(db, "placements", "place"); // поле «место / платформа» убрано
   // Размещение на бирже: существующие строки — внешние кошельки (kind = 'wallet').
@@ -120,6 +122,7 @@ CREATE TABLE IF NOT EXISTS placements (
   comment    TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   chain_checked_at TEXT,
+  trx_amount INTEGER,
   created_at TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );

@@ -154,25 +154,45 @@ function fieldToMicro(value: string | undefined): number {
 }
 
 /**
- * Суммарный баланс USDT (включая замороженное и заблокированное) на счёте
- * указанного типа, в целых micro-USDT. `spot` — спотовый счёт,
- * `main` — funding-счёт Bitget. Если активов нет — 0.
+ * Суммарный баланс произвольной монеты (включая замороженное и заблокированное)
+ * на счёте указанного типа, в целых micro-единицах (монета × 1 000 000).
+ * `spot` — спотовый счёт (available + frozen + locked),
+ * `main` — funding-счёт Bitget (available + frozen). Если активов нет — 0.
  */
-export async function fetchUsdtBalanceMicro(account: "spot" | "main"): Promise<number> {
+async function fetchCoinBalanceMicro(coin: string, account: "spot" | "main"): Promise<number> {
   if (account === "spot") {
     // `assetType: "all"` — иначе Bitget скрывает монеты с нулевым балансом
-    const assets = await fetchSpotAssets({ coin: "USDT", assetType: "all" });
+    const assets = await fetchSpotAssets({ coin, assetType: "all" });
     return assets
-      .filter((a) => a.coin === "USDT")
+      .filter((a) => a.coin === coin)
       .reduce(
         (sum, a) => sum + fieldToMicro(a.available) + fieldToMicro(a.frozen) + fieldToMicro(a.locked),
         0,
       );
   }
-  const assets = await fetchFundingAssets({ coin: "USDT" });
+  const assets = await fetchFundingAssets({ coin });
   return assets
-    .filter((a) => a.coin === "USDT")
+    .filter((a) => a.coin === coin)
     .reduce((sum, a) => sum + fieldToMicro(a.available) + fieldToMicro(a.frozen), 0);
+}
+
+/**
+ * Суммарный баланс USDT (включая замороженное и заблокированное) на счёте
+ * указанного типа, в целых micro-USDT. `spot` — спотовый счёт,
+ * `main` — funding-счёт Bitget. Если активов нет — 0.
+ */
+export function fetchUsdtBalanceMicro(account: "spot" | "main"): Promise<number> {
+  return fetchCoinBalanceMicro("USDT", account);
+}
+
+/**
+ * Суммарный баланс TRX (включая замороженное и заблокированное) на счёте
+ * указанного типа, в целых micro-TRX (TRX × 1 000 000). `spot` — спотовый счёт,
+ * `main` — funding-счёт Bitget. У TRX 6 знаков после запятой — как у USDT.
+ * Если активов нет — 0.
+ */
+export function fetchTrxBalanceMicro(account: "spot" | "main"): Promise<number> {
+  return fetchCoinBalanceMicro("TRX", account);
 }
 
 export interface BitgetAccountBalance {

@@ -33,6 +33,7 @@ const toPlacement = (r: Row): Placement => ({
   exchange_account: (r.exchange_account as ExchangeAccount | null) ?? null,
   comment: (r.comment as string | null) ?? null,
   chain_checked_at: (r.chain_checked_at as string | null) ?? null,
+  trx_amount: r.trx_amount === null ? null : fromMicro(Number(r.trx_amount)),
   created_at: String(r.created_at),
   updated_at: String(r.updated_at),
 });
@@ -222,12 +223,16 @@ export async function listExchangePlacements(): Promise<
   }));
 }
 
-/** Перезаписывает сумму размещения балансом из сети или с биржи. */
-export async function updateAmountFromChain(id: number, micro: number): Promise<void> {
+/** Перезаписывает балансы размещения (USDT в amount, TRX в trx_amount) из сети или с биржи. */
+export async function updateBalancesFromChain(
+  id: number,
+  usdtMicro: number,
+  trxMicro: number,
+): Promise<void> {
   const db = await getClient();
   await db.execute({
-    sql: "UPDATE placements SET amount = ?, chain_checked_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
-    args: [micro, id],
+    sql: "UPDATE placements SET amount = ?, trx_amount = ?, chain_checked_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+    args: [usdtMicro, trxMicro, id],
   });
 }
 

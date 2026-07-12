@@ -129,16 +129,30 @@ const ACCOUNT_TYPES: Record<"spot" | "main", KucoinAccountType[]> = {
 };
 
 /**
- * Суммарный баланс USDT на счетах указанного типа в micro-USDT (целое, USDT × 1 000 000).
- * Берётся полный баланс (`balance`, включая заблокированное в ордерах), а не `available`.
+ * Суммарный баланс произвольной монеты на счетах указанного типа в целых
+ * micro-единицах (монета × 1 000 000). Берётся полный баланс (`balance`,
+ * включая заблокированное в ордерах), а не `available`.
  * Один запрос с фильтром по валюте; фильтрация по типам счёта — локально,
  * потому что API принимает лишь один type, а для "spot" нужны два.
  * Если подходящих счетов нет — 0.
  */
-export async function fetchUsdtBalanceMicro(account: "spot" | "main"): Promise<number> {
+async function fetchCoinBalanceMicro(coin: string, account: "spot" | "main"): Promise<number> {
   const types = ACCOUNT_TYPES[account];
-  const accounts = await fetchAccounts({ currency: "USDT" });
+  const accounts = await fetchAccounts({ currency: coin });
   return accounts
-    .filter((a) => a.currency === "USDT" && types.includes(a.type))
+    .filter((a) => a.currency === coin && types.includes(a.type))
     .reduce((sum, a) => sum + decimalToMicro(a.balance), 0);
+}
+
+/** Суммарный баланс USDT на счёте указанного типа в целых micro-USDT (USDT × 1 000 000). */
+export function fetchUsdtBalanceMicro(account: "spot" | "main"): Promise<number> {
+  return fetchCoinBalanceMicro("USDT", account);
+}
+
+/**
+ * Суммарный баланс TRX на счёте указанного типа в целых micro-TRX (TRX × 1 000 000).
+ * У TRX 6 знаков после запятой — та же точность, что у USDT.
+ */
+export function fetchTrxBalanceMicro(account: "spot" | "main"): Promise<number> {
+  return fetchCoinBalanceMicro("TRX", account);
 }

@@ -2,6 +2,11 @@ const usdtFormatter = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 0,
 });
 
+/** Форматирует число суммы без единицы: 1234.5 -> "1 235" (ru-RU, целые). */
+export function formatAmount(value: number): string {
+  return usdtFormatter.format(value);
+}
+
 /** 1234.5 -> "1 235" (единица USDT отображается иконкой, см. UsdtAmount). */
 export function formatUsdt(value: number): string {
   return usdtFormatter.format(value);

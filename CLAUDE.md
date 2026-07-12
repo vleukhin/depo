@@ -76,7 +76,7 @@ Single password (`APP_PASSWORD`); session is an HMAC-signed `exp.signature` toke
 
 ### TRON balance check
 
-`POST /api/placements/check-balances` iterates placements that have a valid TRON address and **overwrites** their `amount` with the on-chain USDT balance (`chain_checked_at` records when). `lib/tron.ts` deliberately calls `balanceOf(address)` on the USDT contract via TronGrid's `triggerconstantcontract` instead of the accounts endpoint — the accounts endpoint returns empty data for unactivated addresses even when they hold USDT. It retries on 429 and paces requests (shorter pause when `TRONGRID_API_KEY` is set).
+`POST /api/placements/check-balances` iterates placements (wallets by TRON address, exchange rows by KuCoin/Bitget API) and **overwrites** their `amount` with the USDT balance and `trx_amount` with the native TRX balance via `updateBalancesFromChain` (`chain_checked_at` records when). TRX is informational — shown in its own column, not part of the USDT reconciliation. `lib/tron.ts` deliberately calls `balanceOf(address)` on the USDT contract via TronGrid's `triggerconstantcontract` instead of the accounts endpoint — the accounts endpoint returns empty data for unactivated addresses even when they hold USDT. It retries on 429 and paces requests (shorter pause when `TRONGRID_API_KEY` is set).
 
 ## Adding a field or entity — the cross-cutting checklist
 
