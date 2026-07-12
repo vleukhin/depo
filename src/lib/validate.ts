@@ -26,7 +26,6 @@ export const placementInput = z
     kind: z
       .enum(["wallet", "exchange"], { message: "Некорректный тип размещения" })
       .default("wallet"),
-    place: optionalText,
     address: optionalText,
     exchange: z
       .enum(EXCHANGES, { message: "Некорректная биржа" })

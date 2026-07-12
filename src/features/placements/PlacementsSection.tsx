@@ -115,7 +115,6 @@ export function PlacementsSection() {
                 <TableHead className="w-8" />
                 <TableHead>Название</TableHead>
                 <TableHead className="text-right">Сумма</TableHead>
-                <TableHead>Место</TableHead>
                 <TableHead>Адрес / счёт</TableHead>
                 <TableHead>Комментарий</TableHead>
                 <TableHead className="w-24" />
@@ -135,7 +134,6 @@ export function PlacementsSection() {
                   >
                     {formatUsdt(p.amount)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{p.place ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground max-w-40">
                     {p.kind === "exchange" && p.exchange && p.exchange_account ? (
                       <span className="font-sans">
@@ -166,7 +164,7 @@ export function PlacementsSection() {
               ))}
               {!isLoading && placements.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     Пока нет записей
                   </TableCell>
                 </TableRow>

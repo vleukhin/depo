@@ -22,7 +22,6 @@ interface FundRow {
 }
 interface PlacementRow extends FundRow {
   kind: PlacementKind;
-  place: string | null;
   address: string | null;
   exchange: Exchange | null;
   exchange_account: ExchangeAccount | null;
@@ -78,13 +77,12 @@ export function listPlacements(): Placement[] {
 export function createPlacement(input: PlacementInput): Placement {
   const info = db
     .prepare(
-      "INSERT INTO placements (name, amount, kind, place, address, exchange, exchange_account, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
+      "INSERT INTO placements (name, amount, kind, address, exchange, exchange_account, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
     )
     .run(
       input.name,
       toMicro(input.amount),
       input.kind,
-      input.place,
       input.address,
       input.exchange,
       input.exchange_account,
@@ -97,13 +95,12 @@ export function createPlacement(input: PlacementInput): Placement {
 export function updatePlacement(id: number, input: PlacementInput): Placement | null {
   const info = db
     .prepare(
-      "UPDATE placements SET name = ?, amount = ?, kind = ?, place = ?, address = ?, exchange = ?, exchange_account = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
+      "UPDATE placements SET name = ?, amount = ?, kind = ?, address = ?, exchange = ?, exchange_account = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
     )
     .run(
       input.name,
       toMicro(input.amount),
       input.kind,
-      input.place,
       input.address,
       input.exchange,
       input.exchange_account,

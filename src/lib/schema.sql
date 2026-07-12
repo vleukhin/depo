@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS placements (
   name       TEXT    NOT NULL,               -- название
   amount     INTEGER NOT NULL DEFAULT 0,     -- сумма (micro-USDT)
   kind       TEXT    NOT NULL DEFAULT 'wallet' CHECK (kind IN ('wallet','exchange')), -- внешний кошелёк или биржа
-  place      TEXT,                           -- место / платформа
   address    TEXT,                           -- адрес (только для kind = 'wallet')
   exchange   TEXT    CHECK (exchange IS NULL OR exchange IN ('KuCoin','Bitget')), -- биржа (только для kind = 'exchange')
   exchange_account TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main')), -- тип счёта на бирже

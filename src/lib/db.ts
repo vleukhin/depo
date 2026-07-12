@@ -27,6 +27,7 @@ function migrate(db: Database.Database) {
   ensureColumn(db, "debts", "sort_order", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "placements", "chain_checked_at", "TEXT", { backfillFromId: false });
   dropColumn(db, "placements", "chain_balance"); // колонка из ранней версии, сумма пишется в amount
+  dropColumn(db, "placements", "place"); // поле «место / платформа» убрано
   // Размещение на бирже: существующие строки — внешние кошельки (kind = 'wallet').
   ensureColumn(
     db,

@@ -62,7 +62,6 @@ export function PlacementForm({
       name: placement?.name ?? "",
       amount: placement?.amount ?? 0,
       kind: placement?.kind ?? "wallet",
-      place: placement?.place ?? "",
       address: placement?.address ?? "",
       exchange: placement?.exchange ?? null,
       exchange_account: placement?.exchange_account ?? null,
@@ -108,29 +107,23 @@ export function PlacementForm({
           {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Тип размещения</Label>
-          <Select
-            value={kind}
-            onValueChange={(v) => setValue("kind", v as PlacementKind)}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(Object.entries(KIND_LABELS) as [PlacementKind, string][]).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="p-place">Место / платформа</Label>
-          <Input id="p-place" placeholder="Напр. CEX, кошелёк" {...register("place")} />
-        </div>
+      <div className="space-y-2">
+        <Label>Тип размещения</Label>
+        <Select
+          value={kind}
+          onValueChange={(v) => setValue("kind", v as PlacementKind)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.entries(KIND_LABELS) as [PlacementKind, string][]).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       {kind === "exchange" ? (
         <div className="grid grid-cols-2 gap-4">

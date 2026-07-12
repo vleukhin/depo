@@ -24,7 +24,6 @@ export interface Placement {
   name: string;
   amount: number;
   kind: PlacementKind;
-  place: string | null;
   address: string | null; // только для kind = 'wallet'
   exchange: Exchange | null; // только для kind = 'exchange'
   exchange_account: ExchangeAccount | null; // тип счёта на бирже
