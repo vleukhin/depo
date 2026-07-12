@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SERVICES } from "@/types";
+import { EXCHANGE_ACCOUNTS, EXCHANGES, SERVICES } from "@/types";
 
 // Суммы приходят с клиента в десятичных USDT (валидное число; форма шлёт number).
 const amount = z
@@ -19,13 +19,41 @@ export const fundInput = z.object({
   amount,
 });
 
-export const placementInput = z.object({
-  name: z.string().trim().min(1, "Укажите название").max(200),
-  amount,
-  place: optionalText,
-  address: optionalText,
-  comment: optionalText,
-});
+export const placementInput = z
+  .object({
+    name: z.string().trim().min(1, "Укажите название").max(200),
+    amount,
+    kind: z
+      .enum(["wallet", "exchange"], { message: "Некорректный тип размещения" })
+      .default("wallet"),
+    place: optionalText,
+    address: optionalText,
+    exchange: z
+      .enum(EXCHANGES, { message: "Некорректная биржа" })
+      .nullish()
+      .transform((v) => v ?? null),
+    exchange_account: z
+      .enum(EXCHANGE_ACCOUNTS, { message: "Некорректный тип счёта" })
+      .nullish()
+      .transform((v) => v ?? null),
+    comment: optionalText,
+  })
+  .superRefine((v, ctx) => {
+    if (v.kind === "exchange") {
+      if (!v.exchange) {
+        ctx.addIssue({ code: "custom", path: ["exchange"], message: "Выберите биржу" });
+      }
+      if (!v.exchange_account) {
+        ctx.addIssue({ code: "custom", path: ["exchange_account"], message: "Выберите тип счёта" });
+      }
+    }
+  })
+  // Поля неактивной ветки обнуляются, чтобы в БД не оседали противоречивые значения.
+  .transform((v) =>
+    v.kind === "exchange"
+      ? { ...v, address: null }
+      : { ...v, exchange: null, exchange_account: null },
+  );
 
 export const debtInput = z.object({
   manager: z.string().trim().min(1, "Укажите менеджера").max(200),

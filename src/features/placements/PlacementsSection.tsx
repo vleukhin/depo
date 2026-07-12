@@ -30,7 +30,7 @@ import {
   useReorderPlacements,
 } from "@/hooks/usePlacements";
 import type { Placement } from "@/types";
-import { PlacementForm } from "./PlacementForm";
+import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
 
 function AddressCell({ address }: { address: string | null }) {
   if (!address) return <span className="text-muted-foreground">—</span>;
@@ -116,7 +116,7 @@ export function PlacementsSection() {
                 <TableHead>Название</TableHead>
                 <TableHead className="text-right">Сумма</TableHead>
                 <TableHead>Место</TableHead>
-                <TableHead>Адрес</TableHead>
+                <TableHead>Адрес / счёт</TableHead>
                 <TableHead>Комментарий</TableHead>
                 <TableHead className="w-24" />
               </TableRow>
@@ -137,7 +137,13 @@ export function PlacementsSection() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{p.place ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground max-w-40">
-                    <AddressCell address={p.address} />
+                    {p.kind === "exchange" && p.exchange && p.exchange_account ? (
+                      <span className="font-sans">
+                        {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
+                      </span>
+                    ) : (
+                      <AddressCell address={p.address} />
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
                     {p.comment ?? "—"}

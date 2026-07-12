@@ -1,0 +1,135 @@
+// Взаимодействие с REST API биржи Bitget (API v2).
+//
+// Приватные запросы подписываются:
+//   ACCESS-SIGN       = base64(HMAC-SHA256(secret, timestamp + METHOD + endpoint + body))
+//   ACCESS-PASSPHRASE = passphrase открытым текстом (в отличие от KuCoin v2 — без подписи)
+// Для GET endpoint включает query-строку: ключи отсортированы по алфавиту и не
+// URL-кодируются — ровно так строит её официальный SDK Bitget, а подписанная
+// строка обязана совпадать с фактическим путём запроса.
+//
+// Модуль намеренно ничего не знает о сущностях приложения (funds/placements/БД) —
+// это чистый клиент биржи. Достаточно ключа с правом Read-only.
+
+import { createHmac } from "node:crypto";
+
+const BASE_URL = process.env.BITGET_API_URL ?? "https://api.bitget.com";
+const OK_CODE = "00000"; // прикладной «успех» в конверте ответа
+
+const hmac = (secret: string, payload: string): string =>
+  createHmac("sha256", secret).update(payload).digest("base64");
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function credentials(): { key: string; secret: string; passphrase: string } {
+  const key = process.env.BITGET_API_KEY;
+  const secret = process.env.BITGET_API_SECRET;
+  const passphrase = process.env.BITGET_API_PASSPHRASE;
+  if (!key || !secret || !passphrase) {
+    throw new Error(
+      "Не заданы переменные BITGET_API_KEY / BITGET_API_SECRET / BITGET_API_PASSPHRASE",
+    );
+  }
+  return { key, secret, passphrase };
+}
+
+type QueryParams = Record<string, string | number | undefined>;
+
+/**
+ * Собирает query-строку как официальный SDK Bitget: ключи по алфавиту, значения
+ * без URL-кодирования (параметры здесь — простые алфавитно-цифровые значения).
+ * Пусто -> "".
+ */
+function buildQuery(params: QueryParams = {}): string {
+  const pairs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== "")
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`);
+  return pairs.length ? `?${pairs.join("&")}` : "";
+}
+
+interface BitgetEnvelope<T> {
+  code: string;
+  msg?: string;
+  data?: T;
+}
+
+/**
+ * Подписанный приватный запрос к Bitget; возвращает поле `data` из ответа.
+ * Прикладной статус проверяется по `code` в конверте, а не только по HTTP.
+ * На 429 (rate limit) — до 3 повторов с растущей паузой; подпись пересчитывается
+ * на каждой попытке (timestamp обязан совпадать с заголовком).
+ */
+export async function signedRequest<T>(
+  method: "GET" | "POST",
+  path: string,
+  opts: { query?: QueryParams; body?: unknown } = {},
+): Promise<T> {
+  const { key, secret, passphrase } = credentials();
+  const endpoint = `${path}${buildQuery(opts.query)}`;
+  const body = opts.body === undefined ? "" : JSON.stringify(opts.body);
+
+  let res: Response;
+  let attempt = 0;
+  for (;;) {
+    const timestamp = String(Date.now());
+    res = await fetch(`${BASE_URL}${endpoint}`, {
+      method,
+      headers: {
+        "ACCESS-KEY": key,
+        "ACCESS-TIMESTAMP": timestamp,
+        "ACCESS-SIGN": hmac(secret, timestamp + method + endpoint + body),
+        "ACCESS-PASSPHRASE": passphrase,
+        "Content-Type": "application/json",
+        locale: "en-US",
+      },
+      body: method === "GET" ? undefined : body,
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    if (res.status !== 429 || attempt >= 3) break;
+    attempt++;
+    await sleep(1000 * attempt); // 1с, 2с, 3с
+  }
+
+  const json = (await res.json().catch(() => null)) as BitgetEnvelope<T> | null;
+  if (!res.ok || !json || json.code !== OK_CODE) {
+    throw new Error(`Bitget: ${json?.msg ?? `HTTP ${res.status}`}`);
+  }
+  if (json.data === undefined) {
+    throw new Error("Bitget: пустой ответ");
+  }
+  return json.data;
+}
+
+// ================= БАЛАНСЫ =================
+
+export interface BitgetSpotAsset {
+  coin: string;
+  available: string; // суммы Bitget отдаёт строками; десятичный разбор — на стороне вызывающего
+  frozen: string;
+  locked: string;
+  limitAvailable: string;
+  uTime: string;
+}
+
+/**
+ * Балансы спотового счёта: GET /api/v2/spot/account/assets.
+ * Фильтры: по монете и по составу выборки (`hold_only` — только ненулевые, по умолчанию; `all`).
+ */
+export function fetchSpotAssets(
+  filter: { coin?: string; assetType?: "hold_only" | "all" } = {},
+): Promise<BitgetSpotAsset[]> {
+  return signedRequest<BitgetSpotAsset[]>("GET", "/api/v2/spot/account/assets", {
+    query: filter,
+  });
+}
+
+export interface BitgetAccountBalance {
+  accountType: string; // spot / futures / funding / earn / bot / margin ...
+  usdtBalance: string; // оценка счёта в USDT
+}
+
+/** Сводка по всем типам счетов в USDT: GET /api/v2/account/all-account-balance. */
+export function fetchAllAccountBalances(): Promise<BitgetAccountBalance[]> {
+  return signedRequest<BitgetAccountBalance[]>("GET", "/api/v2/account/all-account-balance");
+}
