@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,10 +21,12 @@ import {
 import { SectionCard } from "@/components/SectionCard";
 import { DeleteButton } from "@/components/DeleteButton";
 import { SortableRow, SortableRows } from "@/components/SortableRows";
+import { formatDate, formatUsdt } from "@/lib/format";
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { useDebts, useDeleteDebt, useReorderDebts } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
 import { DebtForm } from "./DebtForm";
+import { ManagersDialog } from "@/features/managers/ManagersDialog";
 
 function sourceLabel(debt: Debt): string {
   if (debt.placement_name) return debt.placement_name;
@@ -37,6 +39,7 @@ export function DebtsSection() {
   const del = useDeleteDebt();
   const reorder = useReorderDebts();
   const [open, setOpen] = useState(false);
+  const [managersOpen, setManagersOpen] = useState(false);
   const [editing, setEditing] = useState<Debt | undefined>(undefined);
 
   function openCreate() {
@@ -54,6 +57,12 @@ export function DebtsSection() {
       title="Долги"
       description="Кто и сколько взял из депо"
       onAdd={openCreate}
+      actions={
+        <Button size="sm" variant="outline" onClick={() => setManagersOpen(true)}>
+          <Users className="size-4" />
+          Менеджеры
+        </Button>
+      }
     >
       <div className="overflow-x-auto">
         <SortableRows ids={debts.map((d) => d.id)} onReorder={(ids) => reorder.mutate(ids)}>
@@ -62,6 +71,7 @@ export function DebtsSection() {
               <TableRow>
                 <TableHead className="w-8" />
                 <TableHead>Менеджер</TableHead>
+                <TableHead>Дата</TableHead>
                 <TableHead className="text-right">Сумма</TableHead>
                 <TableHead>Сервис</TableHead>
                 <TableHead>Откуда взял</TableHead>
@@ -72,9 +82,12 @@ export function DebtsSection() {
             <TableBody>
               {debts.map((debt) => (
                 <SortableRow key={debt.id} id={debt.id}>
-                  <TableCell className="font-medium">{debt.manager}</TableCell>
-                  <TableCell className="text-right">
-                    <UsdtAmount value={debt.amount} />
+                  <TableCell className="font-medium">{debt.manager_name ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
+                    {formatDate(debt.date)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatUsdt(debt.amount)}
                   </TableCell>
                   <TableCell>
                     {debt.service ? (
@@ -102,7 +115,7 @@ export function DebtsSection() {
               ))}
               {!isLoading && debts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     Пока нет записей
                   </TableCell>
                 </TableRow>
@@ -120,6 +133,8 @@ export function DebtsSection() {
           <DebtForm debt={editing} onDone={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      <ManagersDialog open={managersOpen} onOpenChange={setManagersOpen} />
     </SectionCard>
   );
 }

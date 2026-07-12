@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 export function createResourceHooks<T extends { id: number }, Input>(
   key: string,
   path: string,
+  opts?: { invalidateKeys?: string[] },
 ) {
   const listKey = [key];
   const url = `/api/${path}`;
@@ -18,6 +19,8 @@ export function createResourceHooks<T extends { id: number }, Input>(
     return () => {
       qc.invalidateQueries({ queryKey: listKey });
       qc.invalidateQueries({ queryKey: ["summary"] });
+      // Доп. ключи: напр. переименование менеджера должно обновить таблицу долгов.
+      opts?.invalidateKeys?.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
     };
   }
 

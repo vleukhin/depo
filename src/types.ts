@@ -40,10 +40,20 @@ export interface CheckBalancesResult {
   skipped: number; // строки-кошельки без валидного TRON-адреса
 }
 
+export interface Manager {
+  id: number;
+  name: string;
+  telegram: string | null; // ник телеграм, NULL — не указан
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Debt {
   id: number;
-  manager: string;
+  manager_id: number | null; // FK -> managers; NULL быть не должно (форма требует выбор)
+  manager_name: string | null; // подтягивается через LEFT JOIN
   amount: number;
+  date: string; // дата долга (YYYY-MM-DD)
   service: Service | null;
   placement_id: number | null;
   placement_name: string | null; // подтягивается через LEFT JOIN

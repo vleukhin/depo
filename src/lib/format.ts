@@ -17,3 +17,11 @@ export function formatUsdtSigned(value: number): string {
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   return `${sign}${usdtFormatter.format(Math.abs(value))}`;
 }
+
+const dateFormatter = new Intl.DateTimeFormat("ru-RU");
+
+/** "2026-07-12" или Date -> "12.07.2026" */
+export function formatDate(value: string | Date): string {
+  const d = typeof value === "string" ? new Date(`${value}T00:00:00`) : value;
+  return dateFormatter.format(d);
+}

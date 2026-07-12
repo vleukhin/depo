@@ -3,6 +3,7 @@ import { getClient } from "@/lib/db";
 import { fromMicro, toMicro } from "@/lib/money";
 import type {
   Fund,
+  Manager,
   Placement,
   Debt,
   Summary,
@@ -11,8 +12,46 @@ import type {
   Exchange,
   ExchangeAccount,
 } from "@/types";
-import type { FundInput, PlacementInput, DebtInput } from "@/lib/validate";
+import type { FundInput, ManagerInput, PlacementInput, DebtInput } from "@/lib/validate";
 
+// --- Внутренние формы строк БД (amount в micro-USDT) ---
+interface FundRow {
+  id: number;
+  name: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+}
+interface PlacementRow extends FundRow {
+  kind: PlacementKind;
+  place: string | null;
+  address: string | null;
+  exchange: Exchange | null;
+  exchange_account: ExchangeAccount | null;
+  comment: string | null;
+  chain_checked_at: string | null;
+}
+interface ManagerRow {
+  id: number;
+  name: string;
+  telegram: string | null;
+  created_at: string;
+  updated_at: string;
+}
+interface DebtRow {
+  id: number;
+  manager_id: number | null;
+  manager_name: string | null;
+  amount: number;
+  date: string;
+  service: Service | null;
+  placement_id: number | null;
+  placement_name: string | null;
+  source_text: string | null;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
+}
 // --- Мапперы строк БД (amount в micro-USDT) в доменные типы (amount в USDT) ---
 // Явно перечисляем поля, чтобы в JSON не утекали служебные свойства Row из libSQL.
 const toFund = (r: Row): Fund => ({
@@ -23,6 +62,7 @@ const toFund = (r: Row): Fund => ({
   updated_at: String(r.updated_at),
 });
 
+const toFund = (r: FundRow): Fund => ({ ...r, amount: fromMicro(r.amount) });
 const toPlacement = (r: Row): Placement => ({
   id: Number(r.id),
   name: String(r.name),
@@ -37,6 +77,8 @@ const toPlacement = (r: Row): Placement => ({
   created_at: String(r.created_at),
   updated_at: String(r.updated_at),
 });
+const toDebt = (r: DebtRow): Debt => ({ ...r, amount: fromMicro(r.amount) });
+const toManager = (r: ManagerRow): Manager => ({ ...r });
 
 const toDebt = (r: Row): Debt => ({
   id: Number(r.id),
@@ -83,6 +125,36 @@ export async function deleteFund(id: number): Promise<boolean> {
   const db = await getClient();
   const rs = await db.execute({ sql: "DELETE FROM funds WHERE id = ?", args: [id] });
   return rs.rowsAffected > 0;
+}
+
+// ================= MANAGERS =================
+export function listManagers(): Manager[] {
+  const rows = db
+    .prepare("SELECT * FROM managers ORDER BY name COLLATE NOCASE ASC")
+    .all() as ManagerRow[];
+  return rows.map(toManager);
+}
+export function createManager(input: ManagerInput): Manager {
+  const info = db
+    .prepare("INSERT INTO managers (name, telegram) VALUES (?, ?)")
+    .run(input.name, input.telegram);
+  return toManager(
+    db.prepare("SELECT * FROM managers WHERE id = ?").get(info.lastInsertRowid) as ManagerRow,
+  );
+}
+export function updateManager(id: number, input: ManagerInput): Manager | null {
+  const info = db
+    .prepare("UPDATE managers SET name = ?, telegram = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(input.name, input.telegram, id);
+  if (info.changes === 0) return null;
+  return toManager(db.prepare("SELECT * FROM managers WHERE id = ?").get(id) as ManagerRow);
+}
+export function deleteManager(id: number): boolean {
+  return db.prepare("DELETE FROM managers WHERE id = ?").run(id).changes > 0;
+}
+/** Есть ли долги, ссылающиеся на менеджера (удаление таких запрещено). */
+export function managerInUse(id: number): boolean {
+  return !!db.prepare("SELECT 1 FROM debts WHERE manager_id = ? LIMIT 1").get(id);
 }
 
 // ================= PLACEMENTS =================
@@ -141,7 +213,10 @@ export async function deletePlacement(id: number): Promise<boolean> {
 
 // ================= DEBTS =================
 const DEBT_SELECT =
-  "SELECT d.*, p.name AS placement_name FROM debts d LEFT JOIN placements p ON p.id = d.placement_id";
+  "SELECT d.*, p.name AS placement_name, m.name AS manager_name " +
+  "FROM debts d " +
+  "LEFT JOIN placements p ON p.id = d.placement_id " +
+  "LEFT JOIN managers m ON m.id = d.manager_id";
 
 export async function listDebts(): Promise<Debt[]> {
   const db = await getClient();
@@ -156,10 +231,17 @@ async function getDebt(id: number): Promise<Debt> {
 export async function createDebt(input: DebtInput): Promise<Debt> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "INSERT INTO debts (manager, amount, service, placement_id, source_text, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
+    sql: "INSERT INTO debts (manager_id, amount, date, service, placement_id, source_text, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
     args: [
-      input.manager,
+      input.manager_id,
+      input.amount,
+      input.date,
+      input.service,
+      input.placement_id,
+      input.source_text,
+      input.comment,
       toMicro(input.amount),
+      input.date,
       input.service,
       input.placement_id,
       input.source_text,
@@ -171,10 +253,18 @@ export async function createDebt(input: DebtInput): Promise<Debt> {
 export async function updateDebt(id: number, input: DebtInput): Promise<Debt | null> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "UPDATE debts SET manager = ?, amount = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
+    sql: "UPDATE debts SET manager_id = ?, amount = ?, date = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
     args: [
-      input.manager,
+      input.manager_id,
+      input.amount,
+      input.date,
+      input.service,
+      input.placement_id,
+      input.source_text,
+      input.comment,
+      id,
       toMicro(input.amount),
+      input.date,
       input.service,
       input.placement_id,
       input.source_text,

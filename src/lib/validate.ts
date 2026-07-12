@@ -19,6 +19,11 @@ export const fundInput = z.object({
   amount,
 });
 
+export const managerInput = z.object({
+  name: z.string().trim().min(1, "Укажите имя").max(200),
+  telegram: optionalText,
+});
+
 export const placementInput = z
   .object({
     name: z.string().trim().min(1, "Укажите название").max(200),
@@ -55,8 +60,11 @@ export const placementInput = z
   );
 
 export const debtInput = z.object({
-  manager: z.string().trim().min(1, "Укажите менеджера").max(200),
+  manager_id: z.number({ message: "Выберите менеджера" }).int().positive("Выберите менеджера"),
   amount,
+  date: z.iso
+    .date({ message: "Некорректная дата" })
+    .default(() => new Date().toISOString().slice(0, 10)),
   service: z
     .enum(SERVICES)
     .nullish()
@@ -76,9 +84,11 @@ export const reorderInput = z.object({
 });
 
 export type FundInput = z.infer<typeof fundInput>;
+export type ManagerInput = z.infer<typeof managerInput>;
 export type PlacementInput = z.infer<typeof placementInput>;
 export type DebtInput = z.infer<typeof debtInput>;
 
 // input-типы для react-hook-form (до zod-трансформаций).
 export type FundFormValues = z.input<typeof fundInput>;
+export type ManagerFormValues = z.input<typeof managerInput>;
 export type PlacementFormValues = z.input<typeof placementInput>;
