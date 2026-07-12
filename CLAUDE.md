@@ -1,1 +1,81 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 @AGENTS.md
+
+## What this is
+
+«Депо» — a single-user web app for tracking a USDT deposit: funds (средства), placements (размещение), debts (долги), and a dashboard that reconciles them (**размещено + долги = депо**). One Next.js 16 (App Router) process serves both the UI and the REST API under `/api/*`. All user-facing text, validation messages, API error messages, and most code comments are in Russian — keep it that way.
+
+## Commands
+
+```bash
+npm install      # required first; also materializes node_modules/next/dist/docs/ (see AGENTS.md)
+npm run dev      # dev server at http://localhost:3000
+npm run build    # production build
+npm run start    # serve production build
+npm run lint     # ESLint (flat config, eslint-config-next core-web-vitals + typescript)
+```
+
+There is no test framework configured.
+
+Before running: copy `.env.example` to `.env`. `APP_PASSWORD` is mandatory — without it login is completely closed. `AUTH_SECRET` signs session cookies; `TRONGRID_API_KEY` is optional (raises TronGrid rate limits); `DB_PATH` overrides the SQLite file location (default `data/depo.db`, auto-created, gitignored).
+
+## Next.js 16 specifics used here
+
+This repo relies on conventions that differ from older Next.js — check `node_modules/next/dist/docs/` before assuming:
+
+- **`src/proxy.ts` replaces `middleware.ts`**: it exports a `proxy(request)` function plus a `config.matcher`. It gates every route except `/login` and `/api/login` — unauthenticated API calls get a 401 JSON response, pages redirect to `/login`.
+- **Typed route handler context**: dynamic API routes take `ctx: RouteContext<"/api/funds/[id]">` and `params` is a Promise (`(await ctx.params).id`).
+- Every route handler declares `export const runtime = "nodejs"` (required for better-sqlite3 and `node:crypto`).
+- `next.config.ts` keeps `better-sqlite3` in `serverExternalPackages` — it's a native module and must stay external to the server bundle.
+
+## Architecture
+
+Request flow for every entity (funds, placements, debts):
+
+```
+features/<entity>/*Section.tsx + *Form.tsx      UI (client components, dialogs, tables)
+  → hooks/use<Entity>.ts                        instances of createResourceHooks factory
+    → lib/api.ts                                thin fetch wrapper, throws Error with server message
+      → app/api/<entity>/route.ts (+[id], +reorder)   REST handlers
+        → lib/api-helpers.ts                    handle() / parseBody() / parseId() / notFound()
+        → lib/validate.ts                       zod input schemas
+          → lib/repo.ts                         ALL SQL lives here
+            → lib/db.ts                         better-sqlite3 singleton
+```
+
+### Money: micro-USDT everywhere below the API boundary
+
+Amounts are stored in SQLite as **integer micro-USDT** (USDT × 1 000 000) for exact reconciliation; the API and client work in **decimal USDT**. The conversion (`toMicro`/`fromMicro` from `lib/money.ts`) happens **only in `lib/repo.ts`** — row types (`FundRow` etc.) are micro, domain types in `src/types.ts` are decimal. TRC-20 USDT has 6 decimals, so TronGrid balances are already micro and are written to the DB as-is.
+
+### Database
+
+- `lib/db.ts` creates a `globalThis` singleton (survives dev HMR), enables WAL and foreign keys, and runs `src/lib/schema.sql` (idempotent `CREATE TABLE IF NOT EXISTS`).
+- **Migrations**: `schema.sql` only covers fresh databases. Changes to existing databases go into `migrate()` in `lib/db.ts` using the `ensureColumn`/`dropColumn` helpers. When adding a column, update *both* `schema.sql` and `migrate()`.
+- `debts.placement_id` is a FK to placements with `ON DELETE SET NULL`; debt queries LEFT JOIN to expose `placement_name`.
+
+### API conventions
+
+- Handlers wrap their body in `handle()` from `lib/api-helpers.ts`. Helpers **throw `NextResponse`** for error short-circuits (`notFound()`, `parseId()`, `parseBody()`); `handle()` catches thrown responses and `ZodError`s and turns everything into `{ error: "<русское сообщение>" }` JSON.
+- Endpoints: CRUD `GET/POST /api/<entity>`, `PUT/DELETE /api/<entity>/[id]`; `POST /api/{placements,debts}/reorder` (body `{ ids: number[] }` — array position becomes `sort_order`); `GET /api/summary`; `POST /api/placements/check-balances`; `POST /api/login`, `POST /api/logout`.
+
+### Client conventions
+
+- `hooks/createResourceHooks.ts` generates `useList/useCreate/useUpdate/useDelete/useReorder` per entity. Every mutation invalidates both the entity's list key **and `["summary"]`** so the dashboard reconciliation stays fresh. `useReorder` does an optimistic cache reorder with rollback.
+- Forms use react-hook-form + zod resolvers; use `z.input<typeof schema>` types (e.g. `FundFormValues`) for form values since schemas apply transforms.
+- shadcn/ui components live in `src/components/ui/` (`components.json`: style `radix-nova`, lucide icons, aliases `@/components`, `@/lib`, `@/hooks`). Row drag-and-drop uses dnd-kit via `components/SortableRows.tsx`.
+- Format amounts with `formatUsdt`/`formatUsdtSigned` from `lib/format.ts` (ru-RU locale, no fraction digits).
+
+### Auth
+
+Single password (`APP_PASSWORD`); session is an HMAC-signed `exp.signature` token in an httpOnly cookie (30 days), implemented in `lib/auth.ts`. The signing key is derived from `AUTH_SECRET` + `APP_PASSWORD`, so changing the password invalidates all sessions by design.
+
+### TRON balance check
+
+`POST /api/placements/check-balances` iterates placements that have a valid TRON address and **overwrites** their `amount` with the on-chain USDT balance (`chain_checked_at` records when). `lib/tron.ts` deliberately calls `balanceOf(address)` on the USDT contract via TronGrid's `triggerconstantcontract` instead of the accounts endpoint — the accounts endpoint returns empty data for unactivated addresses even when they hold USDT. It retries on 429 and paces requests (shorter pause when `TRONGRID_API_KEY` is set).
+
+## Adding a field or entity — the cross-cutting checklist
+
+Changes typically touch, in order: `src/lib/schema.sql` + `migrate()` in `lib/db.ts` → `src/types.ts` (decimal domain type) → `lib/validate.ts` (zod schema) → `lib/repo.ts` (row type + SQL + micro conversion) → `app/api/.../route.ts` → hooks → the feature's form and section components.
