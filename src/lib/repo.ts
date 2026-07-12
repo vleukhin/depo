@@ -1,4 +1,5 @@
-import { db } from "@/lib/db";
+import type { Row } from "@libsql/client";
+import { getClient } from "@/lib/db";
 import { fromMicro, toMicro } from "@/lib/money";
 import type {
   Fund,
@@ -12,74 +13,88 @@ import type {
 } from "@/types";
 import type { FundInput, PlacementInput, DebtInput } from "@/lib/validate";
 
-// --- Внутренние формы строк БД (amount в micro-USDT) ---
-interface FundRow {
-  id: number;
-  name: string;
-  amount: number;
-  created_at: string;
-  updated_at: string;
-}
-interface PlacementRow extends FundRow {
-  kind: PlacementKind;
-  address: string | null;
-  exchange: Exchange | null;
-  exchange_account: ExchangeAccount | null;
-  comment: string | null;
-  chain_checked_at: string | null;
-}
-interface DebtRow {
-  id: number;
-  manager: string;
-  amount: number;
-  service: Service | null;
-  placement_id: number | null;
-  placement_name: string | null;
-  source_text: string | null;
-  comment: string | null;
-  created_at: string;
-  updated_at: string;
-}
+// --- Мапперы строк БД (amount в micro-USDT) в доменные типы (amount в USDT) ---
+// Явно перечисляем поля, чтобы в JSON не утекали служебные свойства Row из libSQL.
+const toFund = (r: Row): Fund => ({
+  id: Number(r.id),
+  name: String(r.name),
+  amount: fromMicro(Number(r.amount)),
+  created_at: String(r.created_at),
+  updated_at: String(r.updated_at),
+});
 
-const toFund = (r: FundRow): Fund => ({ ...r, amount: fromMicro(r.amount) });
-const toPlacement = (r: PlacementRow): Placement => ({ ...r, amount: fromMicro(r.amount) });
-const toDebt = (r: DebtRow): Debt => ({ ...r, amount: fromMicro(r.amount) });
+const toPlacement = (r: Row): Placement => ({
+  id: Number(r.id),
+  name: String(r.name),
+  amount: fromMicro(Number(r.amount)),
+  kind: r.kind as PlacementKind,
+  address: (r.address as string | null) ?? null,
+  exchange: (r.exchange as Exchange | null) ?? null,
+  exchange_account: (r.exchange_account as ExchangeAccount | null) ?? null,
+  comment: (r.comment as string | null) ?? null,
+  chain_checked_at: (r.chain_checked_at as string | null) ?? null,
+  created_at: String(r.created_at),
+  updated_at: String(r.updated_at),
+});
+
+const toDebt = (r: Row): Debt => ({
+  id: Number(r.id),
+  manager: String(r.manager),
+  amount: fromMicro(Number(r.amount)),
+  service: (r.service as Service | null) ?? null,
+  placement_id: r.placement_id === null ? null : Number(r.placement_id),
+  placement_name: (r.placement_name as string | null) ?? null,
+  source_text: (r.source_text as string | null) ?? null,
+  comment: (r.comment as string | null) ?? null,
+  created_at: String(r.created_at),
+  updated_at: String(r.updated_at),
+});
 
 // ================= FUNDS =================
-export function listFunds(): Fund[] {
-  const rows = db.prepare("SELECT * FROM funds ORDER BY id DESC").all() as FundRow[];
-  return rows.map(toFund);
+export async function listFunds(): Promise<Fund[]> {
+  const db = await getClient();
+  const rs = await db.execute("SELECT * FROM funds ORDER BY id DESC");
+  return rs.rows.map(toFund);
 }
-export function createFund(input: FundInput): Fund {
-  const info = db
-    .prepare("INSERT INTO funds (name, amount) VALUES (?, ?)")
-    .run(input.name, toMicro(input.amount));
-  return toFund(db.prepare("SELECT * FROM funds WHERE id = ?").get(info.lastInsertRowid) as FundRow);
+export async function createFund(input: FundInput): Promise<Fund> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "INSERT INTO funds (name, amount) VALUES (?, ?)",
+    args: [input.name, toMicro(input.amount)],
+  });
+  const row = await db.execute({
+    sql: "SELECT * FROM funds WHERE id = ?",
+    args: [Number(rs.lastInsertRowid)],
+  });
+  return toFund(row.rows[0]);
 }
-export function updateFund(id: number, input: FundInput): Fund | null {
-  const info = db
-    .prepare("UPDATE funds SET name = ?, amount = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(input.name, toMicro(input.amount), id);
-  if (info.changes === 0) return null;
-  return toFund(db.prepare("SELECT * FROM funds WHERE id = ?").get(id) as FundRow);
+export async function updateFund(id: number, input: FundInput): Promise<Fund | null> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "UPDATE funds SET name = ?, amount = ?, updated_at = datetime('now') WHERE id = ?",
+    args: [input.name, toMicro(input.amount), id],
+  });
+  if (rs.rowsAffected === 0) return null;
+  const row = await db.execute({ sql: "SELECT * FROM funds WHERE id = ?", args: [id] });
+  return toFund(row.rows[0]);
 }
-export function deleteFund(id: number): boolean {
-  return db.prepare("DELETE FROM funds WHERE id = ?").run(id).changes > 0;
+export async function deleteFund(id: number): Promise<boolean> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "DELETE FROM funds WHERE id = ?", args: [id] });
+  return rs.rowsAffected > 0;
 }
 
 // ================= PLACEMENTS =================
-export function listPlacements(): Placement[] {
-  const rows = db
-    .prepare("SELECT * FROM placements ORDER BY sort_order ASC, id ASC")
-    .all() as PlacementRow[];
-  return rows.map(toPlacement);
+export async function listPlacements(): Promise<Placement[]> {
+  const db = await getClient();
+  const rs = await db.execute("SELECT * FROM placements ORDER BY sort_order ASC, id ASC");
+  return rs.rows.map(toPlacement);
 }
-export function createPlacement(input: PlacementInput): Placement {
-  const info = db
-    .prepare(
-      "INSERT INTO placements (name, amount, kind, address, exchange, exchange_account, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
-    )
-    .run(
+export async function createPlacement(input: PlacementInput): Promise<Placement> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "INSERT INTO placements (name, amount, kind, address, exchange, exchange_account, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
+    args: [
       input.name,
       toMicro(input.amount),
       input.kind,
@@ -87,17 +102,22 @@ export function createPlacement(input: PlacementInput): Placement {
       input.exchange,
       input.exchange_account,
       input.comment,
-    );
-  return toPlacement(
-    db.prepare("SELECT * FROM placements WHERE id = ?").get(info.lastInsertRowid) as PlacementRow,
-  );
+    ],
+  });
+  const row = await db.execute({
+    sql: "SELECT * FROM placements WHERE id = ?",
+    args: [Number(rs.lastInsertRowid)],
+  });
+  return toPlacement(row.rows[0]);
 }
-export function updatePlacement(id: number, input: PlacementInput): Placement | null {
-  const info = db
-    .prepare(
-      "UPDATE placements SET name = ?, amount = ?, kind = ?, address = ?, exchange = ?, exchange_account = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
-    )
-    .run(
+export async function updatePlacement(
+  id: number,
+  input: PlacementInput,
+): Promise<Placement | null> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "UPDATE placements SET name = ?, amount = ?, kind = ?, address = ?, exchange = ?, exchange_account = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
+    args: [
       input.name,
       toMicro(input.amount),
       input.kind,
@@ -106,48 +126,52 @@ export function updatePlacement(id: number, input: PlacementInput): Placement | 
       input.exchange_account,
       input.comment,
       id,
-    );
-  if (info.changes === 0) return null;
-  return toPlacement(db.prepare("SELECT * FROM placements WHERE id = ?").get(id) as PlacementRow);
+    ],
+  });
+  if (rs.rowsAffected === 0) return null;
+  const row = await db.execute({ sql: "SELECT * FROM placements WHERE id = ?", args: [id] });
+  return toPlacement(row.rows[0]);
 }
-export function deletePlacement(id: number): boolean {
-  return db.prepare("DELETE FROM placements WHERE id = ?").run(id).changes > 0;
+export async function deletePlacement(id: number): Promise<boolean> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "DELETE FROM placements WHERE id = ?", args: [id] });
+  return rs.rowsAffected > 0;
 }
 
 // ================= DEBTS =================
 const DEBT_SELECT =
   "SELECT d.*, p.name AS placement_name FROM debts d LEFT JOIN placements p ON p.id = d.placement_id";
 
-export function listDebts(): Debt[] {
-  const rows = db
-    .prepare(`${DEBT_SELECT} ORDER BY d.sort_order ASC, d.id ASC`)
-    .all() as DebtRow[];
-  return rows.map(toDebt);
+export async function listDebts(): Promise<Debt[]> {
+  const db = await getClient();
+  const rs = await db.execute(`${DEBT_SELECT} ORDER BY d.sort_order ASC, d.id ASC`);
+  return rs.rows.map(toDebt);
 }
-function getDebt(id: number): Debt {
-  return toDebt(db.prepare(`${DEBT_SELECT} WHERE d.id = ?`).get(id) as DebtRow);
+async function getDebt(id: number): Promise<Debt> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: `${DEBT_SELECT} WHERE d.id = ?`, args: [id] });
+  return toDebt(rs.rows[0]);
 }
-export function createDebt(input: DebtInput): Debt {
-  const info = db
-    .prepare(
-      "INSERT INTO debts (manager, amount, service, placement_id, source_text, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
-    )
-    .run(
+export async function createDebt(input: DebtInput): Promise<Debt> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "INSERT INTO debts (manager, amount, service, placement_id, source_text, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
+    args: [
       input.manager,
       toMicro(input.amount),
       input.service,
       input.placement_id,
       input.source_text,
       input.comment,
-    );
-  return getDebt(Number(info.lastInsertRowid));
+    ],
+  });
+  return getDebt(Number(rs.lastInsertRowid));
 }
-export function updateDebt(id: number, input: DebtInput): Debt | null {
-  const info = db
-    .prepare(
-      "UPDATE debts SET manager = ?, amount = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
-    )
-    .run(
+export async function updateDebt(id: number, input: DebtInput): Promise<Debt | null> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "UPDATE debts SET manager = ?, amount = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
+    args: [
       input.manager,
       toMicro(input.amount),
       input.service,
@@ -155,70 +179,89 @@ export function updateDebt(id: number, input: DebtInput): Debt | null {
       input.source_text,
       input.comment,
       id,
-    );
-  if (info.changes === 0) return null;
+    ],
+  });
+  if (rs.rowsAffected === 0) return null;
   return getDebt(id);
 }
-export function deleteDebt(id: number): boolean {
-  return db.prepare("DELETE FROM debts WHERE id = ?").run(id).changes > 0;
+export async function deleteDebt(id: number): Promise<boolean> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "DELETE FROM debts WHERE id = ?", args: [id] });
+  return rs.rowsAffected > 0;
 }
 
-// ================= CHAIN BALANCE =================
+// ================= CHAIN / EXCHANGE BALANCE =================
 /** Строки размещений с адресами — кандидаты на проверку баланса в сети. */
-export function listPlacementsWithAddress(): { id: number; name: string; address: string }[] {
-  return db
-    .prepare("SELECT id, name, address FROM placements WHERE address IS NOT NULL AND address != ''")
-    .all() as { id: number; name: string; address: string }[];
+export async function listPlacementsWithAddress(): Promise<
+  { id: number; name: string; address: string }[]
+> {
+  const db = await getClient();
+  const rs = await db.execute(
+    "SELECT id, name, address FROM placements WHERE address IS NOT NULL AND address != ''",
+  );
+  return rs.rows.map((r) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    address: String(r.address),
+  }));
 }
 
 /** Строки размещений на биржах — кандидаты на проверку баланса через API биржи. */
-export function listExchangePlacements(): {
-  id: number;
-  name: string;
-  exchange: Exchange;
-  exchange_account: ExchangeAccount;
-}[] {
-  return db
-    .prepare(
-      "SELECT id, name, exchange, exchange_account FROM placements WHERE kind = 'exchange' AND exchange IS NOT NULL AND exchange_account IS NOT NULL",
-    )
-    .all() as { id: number; name: string; exchange: Exchange; exchange_account: ExchangeAccount }[];
+export async function listExchangePlacements(): Promise<
+  { id: number; name: string; exchange: Exchange; exchange_account: ExchangeAccount }[]
+> {
+  const db = await getClient();
+  const rs = await db.execute(
+    "SELECT id, name, exchange, exchange_account FROM placements WHERE kind = 'exchange' AND exchange IS NOT NULL AND exchange_account IS NOT NULL",
+  );
+  return rs.rows.map((r) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    exchange: r.exchange as Exchange,
+    exchange_account: r.exchange_account as ExchangeAccount,
+  }));
 }
 
 /** Перезаписывает сумму размещения балансом из сети или с биржи. */
-export function updateAmountFromChain(id: number, micro: number): void {
-  db.prepare(
-    "UPDATE placements SET amount = ?, chain_checked_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
-  ).run(micro, id);
+export async function updateAmountFromChain(id: number, micro: number): Promise<void> {
+  const db = await getClient();
+  await db.execute({
+    sql: "UPDATE placements SET amount = ?, chain_checked_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+    args: [micro, id],
+  });
 }
 
 // ================= REORDER =================
-/** Перезаписывает sort_order по позиции id в массиве (в транзакции). */
-function reorderTable(table: "placements" | "debts") {
-  const stmt = db.prepare(`UPDATE ${table} SET sort_order = ? WHERE id = ?`);
-  return db.transaction((ids: number[]) => {
-    ids.forEach((id, index) => stmt.run(index, id));
-  });
+/** Перезаписывает sort_order по позиции id в массиве (атомарной пачкой). */
+async function reorder(table: "placements" | "debts", ids: number[]): Promise<void> {
+  const db = await getClient();
+  await db.batch(
+    ids.map((id, index) => ({
+      sql: `UPDATE ${table} SET sort_order = ? WHERE id = ?`,
+      args: [index, id],
+    })),
+    "write",
+  );
 }
-const reorderPlacementsTx = reorderTable("placements");
-const reorderDebtsTx = reorderTable("debts");
-
-export function reorderPlacements(ids: number[]): void {
-  reorderPlacementsTx(ids);
+export function reorderPlacements(ids: number[]): Promise<void> {
+  return reorder("placements", ids);
 }
-export function reorderDebts(ids: number[]): void {
-  reorderDebtsTx(ids);
+export function reorderDebts(ids: number[]): Promise<void> {
+  return reorder("debts", ids);
 }
 
 // ================= SUMMARY =================
-export function getSummary(): Summary {
-  const sum = (table: string) =>
-    (db.prepare(`SELECT COALESCE(SUM(amount), 0) AS s FROM ${table}`).get() as { s: number }).s;
+export async function getSummary(): Promise<Summary> {
+  const db = await getClient();
+  const one = async (table: string): Promise<number> => {
+    const rs = await db.execute(`SELECT COALESCE(SUM(amount), 0) AS s FROM ${table}`);
+    return Number(rs.rows[0].s);
+  };
   // Сверка в micro-единицах: размещено + долги против депо.
   // diff > 0 — избыток, diff < 0 — недостача.
-  const funds = sum("funds");
-  const placements = sum("placements");
-  const debts = sum("debts");
+  const funds = await one("funds");
+  const placements = await one("placements");
+  const debts = await one("debts");
   const diff = placements + debts - funds;
   return {
     total_funds: fromMicro(funds),

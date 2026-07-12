@@ -20,7 +20,7 @@ npm run lint     # ESLint (flat config, eslint-config-next core-web-vitals + typ
 
 There is no test framework configured.
 
-Before running: copy `.env.example` to `.env`. `APP_PASSWORD` is mandatory — without it login is completely closed. `AUTH_SECRET` signs session cookies; `TRONGRID_API_KEY` is optional (raises TronGrid rate limits); `DB_PATH` overrides the SQLite file location (default `data/depo.db`, auto-created, gitignored).
+Before running: copy `.env.example` to `.env`. `APP_PASSWORD` is mandatory — without it login is completely closed. `AUTH_SECRET` signs session cookies; `TRONGRID_API_KEY` is optional (raises TronGrid rate limits); `KUCOIN_*`/`BITGET_*` (key/secret/passphrase) enable exchange balance checks. **Database**: with `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` set the app uses Turso (prod); unset, it falls back to a local SQLite file at `DB_PATH` (default `data/depo.db`, auto-created, gitignored) — the normal dev setup. See `DEPLOY.md` for the Vercel + Turso deploy.
 
 ## Next.js 16 specifics used here
 
@@ -28,8 +28,9 @@ This repo relies on conventions that differ from older Next.js — check `node_m
 
 - **`src/proxy.ts` replaces `middleware.ts`**: it exports a `proxy(request)` function plus a `config.matcher`. It gates every route except `/login` and `/api/login` — unauthenticated API calls get a 401 JSON response, pages redirect to `/login`.
 - **Typed route handler context**: dynamic API routes take `ctx: RouteContext<"/api/funds/[id]">` and `params` is a Promise (`(await ctx.params).id`).
-- Every route handler declares `export const runtime = "nodejs"` (required for better-sqlite3 and `node:crypto`).
-- `next.config.ts` keeps `better-sqlite3` in `serverExternalPackages` — it's a native module and must stay external to the server bundle.
+- Every route handler declares `export const runtime = "nodejs"` (required for `@libsql/client` and `node:crypto`).
+- `next.config.ts` keeps `@libsql/client` in `serverExternalPackages` — it pulls a native addon (for the local `file:` driver) that must stay external to the server bundle.
+- `src/proxy.ts` runs on the **Node.js runtime** (Next 16 default for Proxy) — so `verifySessionToken`'s `node:crypto` works on Vercel without an Edge shim.
 
 ## Architecture
 
@@ -42,19 +43,20 @@ features/<entity>/*Section.tsx + *Form.tsx      UI (client components, dialogs, 
       → app/api/<entity>/route.ts (+[id], +reorder)   REST handlers
         → lib/api-helpers.ts                    handle() / parseBody() / parseId() / notFound()
         → lib/validate.ts                       zod input schemas
-          → lib/repo.ts                         ALL SQL lives here
-            → lib/db.ts                         better-sqlite3 singleton
+          → lib/repo.ts                         ALL SQL lives here (async, @libsql/client)
+            → lib/db.ts                         libSQL client (Turso in prod, local file in dev)
 ```
 
 ### Money: micro-USDT everywhere below the API boundary
 
-Amounts are stored in SQLite as **integer micro-USDT** (USDT × 1 000 000) for exact reconciliation; the API and client work in **decimal USDT**. The conversion (`toMicro`/`fromMicro` from `lib/money.ts`) happens **only in `lib/repo.ts`** — row types (`FundRow` etc.) are micro, domain types in `src/types.ts` are decimal. TRC-20 USDT has 6 decimals, so TronGrid balances are already micro and are written to the DB as-is.
+Amounts are stored as **integer micro-USDT** (USDT × 1 000 000) for exact reconciliation; the API and client work in **decimal USDT**. The conversion (`toMicro`/`fromMicro`, plus `decimalToMicro` for exchange balance strings, from `lib/money.ts`) happens **only in `lib/repo.ts`** — the `to*` row mappers read libSQL `Row`s (micro), domain types in `src/types.ts` are decimal. TRC-20 USDT has 6 decimals, so TronGrid balances are already micro and are written to the DB as-is.
 
 ### Database
 
-- `lib/db.ts` creates a `globalThis` singleton (survives dev HMR), enables WAL and foreign keys, and runs `src/lib/schema.sql` (idempotent `CREATE TABLE IF NOT EXISTS`).
-- **Migrations**: `schema.sql` only covers fresh databases. Changes to existing databases go into `migrate()` in `lib/db.ts` using the `ensureColumn`/`dropColumn` helpers. When adding a column, update *both* `schema.sql` and `migrate()`.
-- `debts.placement_id` is a FK to placements with `ON DELETE SET NULL`; debt queries LEFT JOIN to expose `placement_name`.
+- **libSQL via `@libsql/client`** (SQLite-compatible). `lib/db.ts` exposes `getClient(): Promise<Client>` — a memoized async init (schema + migrations run once) cached on `globalThis` so dev HMR doesn't re-run it. In prod it connects to **Turso** (`TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`); with those unset it falls back to a local file (`file:${DB_PATH}` or `data/depo.db`). **All repo functions are `async`** — every route handler `await`s them.
+- The schema is an **embedded `SCHEMA` string in `lib/db.ts`** (not a separate `.sql` file, so it survives serverless bundling), applied idempotently via `executeMultiple` (`CREATE TABLE IF NOT EXISTS`).
+- **Migrations**: `SCHEMA` only covers fresh databases. Changes to existing databases go into `migrate()` in `lib/db.ts` using the async `ensureColumn`/`dropColumn` helpers. When adding a column, update *both* the `SCHEMA` string and `migrate()`.
+- `debts.placement_id` is a FK to placements with `ON DELETE SET NULL`; debt queries LEFT JOIN to expose `placement_name`. (Turso enforces FKs per the `PRAGMA foreign_keys = ON` set at init; the LEFT JOIN keeps the UI correct even if a stale id lingered.)
 
 ### API conventions
 
@@ -78,4 +80,4 @@ Single password (`APP_PASSWORD`); session is an HMAC-signed `exp.signature` toke
 
 ## Adding a field or entity — the cross-cutting checklist
 
-Changes typically touch, in order: `src/lib/schema.sql` + `migrate()` in `lib/db.ts` → `src/types.ts` (decimal domain type) → `lib/validate.ts` (zod schema) → `lib/repo.ts` (row type + SQL + micro conversion) → `app/api/.../route.ts` → hooks → the feature's form and section components.
+Changes typically touch, in order: the `SCHEMA` string + `migrate()` in `lib/db.ts` → `src/types.ts` (decimal domain type) → `lib/validate.ts` (zod schema) → `lib/repo.ts` (row mapper + async SQL + micro conversion) → `app/api/.../route.ts` (`await` the repo call) → hooks → the feature's form and section components.

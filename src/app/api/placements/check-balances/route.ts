@@ -24,14 +24,14 @@ export function POST() {
     const result: CheckBalancesResult = { checked: 0, failed: [], skipped: 0 };
 
     // Кошельки: баланс USDT (TRC-20) по адресу через TronGrid.
-    for (const { id, name, address } of listPlacementsWithAddress()) {
+    for (const { id, name, address } of await listPlacementsWithAddress()) {
       if (!isTronAddress(address)) {
         result.skipped++;
         continue;
       }
       try {
         const micro = await fetchUsdtBalance(address);
-        updateAmountFromChain(id, micro);
+        await updateAmountFromChain(id, micro);
         result.checked++;
       } catch (err) {
         result.failed.push({
@@ -45,10 +45,10 @@ export function POST() {
     }
 
     // Биржи: баланс USDT на счёте через приватный API (KuCoin/Bitget).
-    for (const { id, name, exchange, exchange_account } of listExchangePlacements()) {
+    for (const { id, name, exchange, exchange_account } of await listExchangePlacements()) {
       try {
         const micro = await EXCHANGE_FETCHERS[exchange](exchange_account);
-        updateAmountFromChain(id, micro);
+        await updateAmountFromChain(id, micro);
         result.checked++;
       } catch (err) {
         result.failed.push({

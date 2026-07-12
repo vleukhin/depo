@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export function POST(request: Request) {
   return handle(async () => {
     const { ids } = await parseBody(request, reorderInput);
-    reorderPlacements(ids);
+    await reorderPlacements(ids);
     return NextResponse.json({ ok: true });
   });
 }

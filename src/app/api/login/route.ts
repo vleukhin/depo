@@ -27,7 +27,8 @@ export async function POST(request: Request) {
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL_S,
-    // приложение ходит по http на localhost/LAN, поэтому без secure
+    // в проде (HTTPS) — только по защищённому соединению; в dev по http — без secure
+    secure: process.env.NODE_ENV === "production",
   });
   return res;
 }

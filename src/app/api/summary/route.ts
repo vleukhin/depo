@@ -5,5 +5,5 @@ import { getSummary } from "@/lib/repo";
 export const runtime = "nodejs";
 
 export function GET() {
-  return handle(() => NextResponse.json(getSummary()));
+  return handle(async () => NextResponse.json(await getSummary()));
 }

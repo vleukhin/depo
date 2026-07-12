@@ -6,12 +6,12 @@ import { createDebt, listDebts } from "@/lib/repo";
 export const runtime = "nodejs";
 
 export function GET() {
-  return handle(() => NextResponse.json(listDebts()));
+  return handle(async () => NextResponse.json(await listDebts()));
 }
 
 export function POST(request: Request) {
   return handle(async () => {
     const input = await parseBody(request, debtInput);
-    return NextResponse.json(createDebt(input), { status: 201 });
+    return NextResponse.json(await createDebt(input), { status: 201 });
   });
 }

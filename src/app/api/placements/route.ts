@@ -6,12 +6,12 @@ import { createPlacement, listPlacements } from "@/lib/repo";
 export const runtime = "nodejs";
 
 export function GET() {
-  return handle(() => NextResponse.json(listPlacements()));
+  return handle(async () => NextResponse.json(await listPlacements()));
 }
 
 export function POST(request: Request) {
   return handle(async () => {
     const input = await parseBody(request, placementInput);
-    return NextResponse.json(createPlacement(input), { status: 201 });
+    return NextResponse.json(await createPlacement(input), { status: 201 });
   });
 }

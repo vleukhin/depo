@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // better-sqlite3 is a native module — keep it external to the server bundle.
-  serverExternalPackages: ["better-sqlite3"],
+  // @libsql/client тянет нативную часть (для локального file:) — держим её вне бандла сервера.
+  serverExternalPackages: ["@libsql/client"],
 };
 
 export default nextConfig;

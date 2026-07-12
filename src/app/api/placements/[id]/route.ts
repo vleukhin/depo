@@ -9,7 +9,7 @@ export function PUT(request: Request, ctx: RouteContext<"/api/placements/[id]">)
   return handle(async () => {
     const id = parseId((await ctx.params).id);
     const input = await parseBody(request, placementInput);
-    const updated = updatePlacement(id, input);
+    const updated = await updatePlacement(id, input);
     if (!updated) notFound();
     return NextResponse.json(updated);
   });
@@ -18,7 +18,7 @@ export function PUT(request: Request, ctx: RouteContext<"/api/placements/[id]">)
 export function DELETE(_request: Request, ctx: RouteContext<"/api/placements/[id]">) {
   return handle(async () => {
     const id = parseId((await ctx.params).id);
-    if (!deletePlacement(id)) notFound();
+    if (!(await deletePlacement(id))) notFound();
     return NextResponse.json({ ok: true });
   });
 }

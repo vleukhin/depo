@@ -13,7 +13,7 @@
 
 ## Стек
 
-Next.js 16 (App Router) · React 19 · TypeScript · TailwindCSS · shadcn/ui · react-hook-form + zod · TanStack Query · SQLite (better-sqlite3).
+Next.js 16 (App Router) · React 19 · TypeScript · TailwindCSS · shadcn/ui · react-hook-form + zod · TanStack Query · libSQL (`@libsql/client`) — Turso в проде, локальный файл SQLite в разработке.
 
 Единый процесс: Next.js отдаёт и UI, и REST API (`/api/*`).
 
@@ -33,9 +33,14 @@ npm run start
 
 ## Данные
 
-- Хранилище — SQLite, файл `data/depo.db` (создаётся автоматически при первом запросе, в `.gitignore`).
-- Путь к БД можно переопределить переменной `DB_PATH`.
+- Слой данных — libSQL (`@libsql/client`), SQL-совместим с SQLite. Весь SQL в `src/lib/repo.ts`, соединение — `src/lib/db.ts`.
+- **Разработка**: если `TURSO_*` не заданы, используется локальный файл `data/depo.db` (создаётся автоматически, в `.gitignore`; путь можно переопределить `DB_PATH`).
+- **Прод**: с `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` приложение работает с Turso. См. [DEPLOY.md](DEPLOY.md).
 - Суммы хранятся как целые micro-USDT (сумма × 1 000 000) для точной сверки; ввод/вывод — в десятичных USDT.
+
+## Деплой
+
+Vercel + Turso, бесплатно для личного использования. Пошагово — в [DEPLOY.md](DEPLOY.md).
 
 ## Модель данных
 

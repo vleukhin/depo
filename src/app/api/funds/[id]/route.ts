@@ -9,7 +9,7 @@ export function PUT(request: Request, ctx: RouteContext<"/api/funds/[id]">) {
   return handle(async () => {
     const id = parseId((await ctx.params).id);
     const input = await parseBody(request, fundInput);
-    const updated = updateFund(id, input);
+    const updated = await updateFund(id, input);
     if (!updated) notFound();
     return NextResponse.json(updated);
   });
@@ -18,7 +18,7 @@ export function PUT(request: Request, ctx: RouteContext<"/api/funds/[id]">) {
 export function DELETE(_request: Request, ctx: RouteContext<"/api/funds/[id]">) {
   return handle(async () => {
     const id = parseId((await ctx.params).id);
-    if (!deleteFund(id)) notFound();
+    if (!(await deleteFund(id))) notFound();
     return NextResponse.json({ ok: true });
   });
 }
