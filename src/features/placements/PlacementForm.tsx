@@ -9,12 +9,37 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogFooter } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   placementInput,
   type PlacementFormValues,
   type PlacementInput,
 } from "@/lib/validate";
 import { useCreatePlacement, useUpdatePlacement } from "@/hooks/usePlacements";
-import type { Placement } from "@/types";
+import {
+  EXCHANGE_ACCOUNTS,
+  EXCHANGES,
+  type Exchange,
+  type ExchangeAccount,
+  type Placement,
+  type PlacementKind,
+} from "@/types";
+
+const KIND_LABELS: Record<PlacementKind, string> = {
+  wallet: "Внешний кошелёк",
+  exchange: "Биржа",
+};
+
+// Подписи типов счёта на бирже; используются и в таблице раздела.
+export const ACCOUNT_LABELS: Record<ExchangeAccount, string> = {
+  spot: "Спотовый",
+  main: "Основной",
+};
 
 export function PlacementForm({
   placement,
@@ -28,17 +53,26 @@ export function PlacementForm({
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<PlacementFormValues, unknown, PlacementInput>({
     resolver: zodResolver(placementInput),
     defaultValues: {
       name: placement?.name ?? "",
       amount: placement?.amount ?? 0,
+      kind: placement?.kind ?? "wallet",
       place: placement?.place ?? "",
       address: placement?.address ?? "",
+      exchange: placement?.exchange ?? null,
+      exchange_account: placement?.exchange_account ?? null,
       comment: placement?.comment ?? "",
     },
   });
+
+  const kind = watch("kind");
+  const exchange = watch("exchange");
+  const exchangeAccount = watch("exchange_account");
 
   const submitting = create.isPending || update.isPending;
 
@@ -76,14 +110,83 @@ export function PlacementForm({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
+          <Label>Тип размещения</Label>
+          <Select
+            value={kind}
+            onValueChange={(v) => setValue("kind", v as PlacementKind)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.entries(KIND_LABELS) as [PlacementKind, string][]).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
           <Label htmlFor="p-place">Место / платформа</Label>
           <Input id="p-place" placeholder="Напр. CEX, кошелёк" {...register("place")} />
         </div>
+      </div>
+      {kind === "exchange" ? (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Биржа</Label>
+            <Select
+              value={exchange ?? ""}
+              onValueChange={(v) =>
+                setValue("exchange", v as Exchange, { shouldValidate: true })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Выберите биржу" />
+              </SelectTrigger>
+              <SelectContent>
+                {EXCHANGES.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {e}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.exchange && (
+              <p className="text-sm text-destructive">{errors.exchange.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Счёт</Label>
+            <Select
+              value={exchangeAccount ?? ""}
+              onValueChange={(v) =>
+                setValue("exchange_account", v as ExchangeAccount, { shouldValidate: true })
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Выберите счёт" />
+              </SelectTrigger>
+              <SelectContent>
+                {EXCHANGE_ACCOUNTS.map((a) => (
+                  <SelectItem key={a} value={a}>
+                    {ACCOUNT_LABELS[a]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.exchange_account && (
+              <p className="text-sm text-destructive">{errors.exchange_account.message}</p>
+            )}
+          </div>
+        </div>
+      ) : (
         <div className="space-y-2">
           <Label htmlFor="p-address">Адрес</Label>
           <Input id="p-address" placeholder="Адрес кошелька / счёта" {...register("address")} />
         </div>
-      </div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="p-comment">Комментарий</Label>
         <Textarea id="p-comment" rows={2} {...register("comment")} />

@@ -27,6 +27,28 @@ function migrate(db: Database.Database) {
   ensureColumn(db, "debts", "sort_order", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "placements", "chain_checked_at", "TEXT", { backfillFromId: false });
   dropColumn(db, "placements", "chain_balance"); // колонка из ранней версии, сумма пишется в amount
+  // Размещение на бирже: существующие строки — внешние кошельки (kind = 'wallet').
+  ensureColumn(
+    db,
+    "placements",
+    "kind",
+    "TEXT NOT NULL DEFAULT 'wallet' CHECK (kind IN ('wallet','exchange'))",
+    { backfillFromId: false },
+  );
+  ensureColumn(
+    db,
+    "placements",
+    "exchange",
+    "TEXT CHECK (exchange IS NULL OR exchange IN ('KuCoin','Bitget'))",
+    { backfillFromId: false },
+  );
+  ensureColumn(
+    db,
+    "placements",
+    "exchange_account",
+    "TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main'))",
+    { backfillFromId: false },
+  );
 }
 
 function dropColumn(db: Database.Database, table: string, column: string) {

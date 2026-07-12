@@ -1,6 +1,15 @@
 import { db } from "@/lib/db";
 import { fromMicro, toMicro } from "@/lib/money";
-import type { Fund, Placement, Debt, Summary, Service } from "@/types";
+import type {
+  Fund,
+  Placement,
+  Debt,
+  Summary,
+  Service,
+  PlacementKind,
+  Exchange,
+  ExchangeAccount,
+} from "@/types";
 import type { FundInput, PlacementInput, DebtInput } from "@/lib/validate";
 
 // --- Внутренние формы строк БД (amount в micro-USDT) ---
@@ -12,8 +21,11 @@ interface FundRow {
   updated_at: string;
 }
 interface PlacementRow extends FundRow {
+  kind: PlacementKind;
   place: string | null;
   address: string | null;
+  exchange: Exchange | null;
+  exchange_account: ExchangeAccount | null;
   comment: string | null;
   chain_checked_at: string | null;
 }
@@ -66,9 +78,18 @@ export function listPlacements(): Placement[] {
 export function createPlacement(input: PlacementInput): Placement {
   const info = db
     .prepare(
-      "INSERT INTO placements (name, amount, place, address, comment, sort_order) VALUES (?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
+      "INSERT INTO placements (name, amount, kind, place, address, exchange, exchange_account, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
     )
-    .run(input.name, toMicro(input.amount), input.place, input.address, input.comment);
+    .run(
+      input.name,
+      toMicro(input.amount),
+      input.kind,
+      input.place,
+      input.address,
+      input.exchange,
+      input.exchange_account,
+      input.comment,
+    );
   return toPlacement(
     db.prepare("SELECT * FROM placements WHERE id = ?").get(info.lastInsertRowid) as PlacementRow,
   );
@@ -76,9 +97,19 @@ export function createPlacement(input: PlacementInput): Placement {
 export function updatePlacement(id: number, input: PlacementInput): Placement | null {
   const info = db
     .prepare(
-      "UPDATE placements SET name = ?, amount = ?, place = ?, address = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
+      "UPDATE placements SET name = ?, amount = ?, kind = ?, place = ?, address = ?, exchange = ?, exchange_account = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
     )
-    .run(input.name, toMicro(input.amount), input.place, input.address, input.comment, id);
+    .run(
+      input.name,
+      toMicro(input.amount),
+      input.kind,
+      input.place,
+      input.address,
+      input.exchange,
+      input.exchange_account,
+      input.comment,
+      id,
+    );
   if (info.changes === 0) return null;
   return toPlacement(db.prepare("SELECT * FROM placements WHERE id = ?").get(id) as PlacementRow);
 }
