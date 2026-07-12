@@ -167,14 +167,28 @@ export function deleteDebt(id: number): boolean {
 }
 
 // ================= CHAIN BALANCE =================
-/** Строки размещений с адресами — кандидаты на проверку баланса. */
+/** Строки размещений с адресами — кандидаты на проверку баланса в сети. */
 export function listPlacementsWithAddress(): { id: number; name: string; address: string }[] {
   return db
     .prepare("SELECT id, name, address FROM placements WHERE address IS NOT NULL AND address != ''")
     .all() as { id: number; name: string; address: string }[];
 }
 
-/** Перезаписывает сумму размещения балансом из сети. */
+/** Строки размещений на биржах — кандидаты на проверку баланса через API биржи. */
+export function listExchangePlacements(): {
+  id: number;
+  name: string;
+  exchange: Exchange;
+  exchange_account: ExchangeAccount;
+}[] {
+  return db
+    .prepare(
+      "SELECT id, name, exchange, exchange_account FROM placements WHERE kind = 'exchange' AND exchange IS NOT NULL AND exchange_account IS NOT NULL",
+    )
+    .all() as { id: number; name: string; exchange: Exchange; exchange_account: ExchangeAccount }[];
+}
+
+/** Перезаписывает сумму размещения балансом из сети или с биржи. */
 export function updateAmountFromChain(id: number, micro: number): void {
   db.prepare(
     "UPDATE placements SET amount = ?, chain_checked_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",

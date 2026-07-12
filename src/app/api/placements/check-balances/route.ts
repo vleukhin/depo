@@ -1,19 +1,30 @@
 import { NextResponse } from "next/server";
 import { handle } from "@/lib/api-helpers";
-import { listPlacementsWithAddress, updateAmountFromChain } from "@/lib/repo";
+import {
+  listExchangePlacements,
+  listPlacementsWithAddress,
+  updateAmountFromChain,
+} from "@/lib/repo";
 import { fetchUsdtBalance, isTronAddress } from "@/lib/tron";
-import type { CheckBalancesResult } from "@/types";
+import { fetchUsdtBalanceMicro as fetchKucoinBalance } from "@/lib/kucoin";
+import { fetchUsdtBalanceMicro as fetchBitgetBalance } from "@/lib/bitget";
+import type { CheckBalancesResult, Exchange, ExchangeAccount } from "@/types";
 
 export const runtime = "nodejs";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const EXCHANGE_FETCHERS: Record<Exchange, (account: ExchangeAccount) => Promise<number>> = {
+  KuCoin: fetchKucoinBalance,
+  Bitget: fetchBitgetBalance,
+};
+
 export function POST() {
   return handle(async () => {
-    const candidates = listPlacementsWithAddress();
     const result: CheckBalancesResult = { checked: 0, failed: [], skipped: 0 };
 
-    for (const { id, name, address } of candidates) {
+    // Кошельки: баланс USDT (TRC-20) по адресу через TronGrid.
+    for (const { id, name, address } of listPlacementsWithAddress()) {
       if (!isTronAddress(address)) {
         result.skipped++;
         continue;
@@ -31,6 +42,22 @@ export function POST() {
       }
       // с API-ключом лимиты TronGrid заметно выше — пауза меньше
       await sleep(process.env.TRONGRID_API_KEY ? 100 : 600);
+    }
+
+    // Биржи: баланс USDT на счёте через приватный API (KuCoin/Bitget).
+    for (const { id, name, exchange, exchange_account } of listExchangePlacements()) {
+      try {
+        const micro = await EXCHANGE_FETCHERS[exchange](exchange_account);
+        updateAmountFromChain(id, micro);
+        result.checked++;
+      } catch (err) {
+        result.failed.push({
+          id,
+          name,
+          error: err instanceof Error ? err.message : "Ошибка запроса",
+        });
+      }
+      await sleep(250);
     }
 
     return NextResponse.json(result);

@@ -77,9 +77,9 @@ export function PlacementsSection() {
             .join(", ")})`,
         );
       } else if (res.checked === 0) {
-        toast.info("Нет строк с TRON-адресами для проверки");
+        toast.info("Нет строк с TRON-адресами или биржевыми счетами для проверки");
       } else {
-        toast.success(`Балансы обновлены (адресов: ${res.checked})`);
+        toast.success(`Балансы обновлены (строк: ${res.checked})`);
       }
     } catch (e) {
       toast.error((e as Error).message);
@@ -129,7 +129,7 @@ export function PlacementsSection() {
                     className="text-right tabular-nums"
                     title={
                       p.chain_checked_at
-                        ? `Обновлено из сети: ${p.chain_checked_at} UTC`
+                        ? `Обновлено автоматически: ${p.chain_checked_at} UTC`
                         : undefined
                     }
                   >

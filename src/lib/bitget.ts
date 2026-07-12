@@ -12,6 +12,8 @@
 
 import { createHmac } from "node:crypto";
 
+import { decimalToMicro } from "@/lib/money";
+
 const BASE_URL = process.env.BITGET_API_URL ?? "https://api.bitget.com";
 const OK_CODE = "00000"; // прикладной «успех» в конверте ответа
 
@@ -122,6 +124,55 @@ export function fetchSpotAssets(
   return signedRequest<BitgetSpotAsset[]>("GET", "/api/v2/spot/account/assets", {
     query: filter,
   });
+}
+
+export interface BitgetFundingAsset {
+  coin: string;
+  available: string; // суммы Bitget отдаёт строками; поле может быть пустой строкой
+  frozen: string;
+  usdtValue: string; // оценка актива в USDT
+}
+
+/**
+ * Балансы funding-счёта: GET /api/v2/account/funding-assets.
+ * Без фильтра по монете возвращает все монеты счёта.
+ */
+export function fetchFundingAssets(
+  filter: { coin?: string } = {},
+): Promise<BitgetFundingAsset[]> {
+  return signedRequest<BitgetFundingAsset[]>("GET", "/api/v2/account/funding-assets", {
+    query: filter,
+  });
+}
+
+/**
+ * Десятичная строка суммы -> micro-USDT; пустую строку или отсутствующее поле
+ * Bitget использует вместо нуля (например, `frozen: ""` на funding-счёте).
+ */
+function fieldToMicro(value: string | undefined): number {
+  return value === undefined || value.trim() === "" ? 0 : decimalToMicro(value);
+}
+
+/**
+ * Суммарный баланс USDT (включая замороженное и заблокированное) на счёте
+ * указанного типа, в целых micro-USDT. `spot` — спотовый счёт,
+ * `main` — funding-счёт Bitget. Если активов нет — 0.
+ */
+export async function fetchUsdtBalanceMicro(account: "spot" | "main"): Promise<number> {
+  if (account === "spot") {
+    // `assetType: "all"` — иначе Bitget скрывает монеты с нулевым балансом
+    const assets = await fetchSpotAssets({ coin: "USDT", assetType: "all" });
+    return assets
+      .filter((a) => a.coin === "USDT")
+      .reduce(
+        (sum, a) => sum + fieldToMicro(a.available) + fieldToMicro(a.frozen) + fieldToMicro(a.locked),
+        0,
+      );
+  }
+  const assets = await fetchFundingAssets({ coin: "USDT" });
+  return assets
+    .filter((a) => a.coin === "USDT")
+    .reduce((sum, a) => sum + fieldToMicro(a.available) + fieldToMicro(a.frozen), 0);
 }
 
 export interface BitgetAccountBalance {

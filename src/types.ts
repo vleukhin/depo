@@ -29,7 +29,7 @@ export interface Placement {
   exchange: Exchange | null; // только для kind = 'exchange'
   exchange_account: ExchangeAccount | null; // тип счёта на бирже
   comment: string | null;
-  chain_checked_at: string | null; // когда сумма обновлялась из сети TRON, NULL — никогда
+  chain_checked_at: string | null; // когда сумма обновлялась из сети/с биржи, NULL — никогда
   created_at: string;
   updated_at: string;
 }
@@ -37,7 +37,7 @@ export interface Placement {
 export interface CheckBalancesResult {
   checked: number;
   failed: { id: number; name: string; error: string }[];
-  skipped: number; // строки без валидного TRON-адреса
+  skipped: number; // строки-кошельки без валидного TRON-адреса
 }
 
 export interface Debt {

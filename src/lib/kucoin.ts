@@ -11,6 +11,8 @@
 
 import { createHmac } from "node:crypto";
 
+import { decimalToMicro } from "@/lib/money";
+
 const BASE_URL = process.env.KUCOIN_API_URL ?? "https://api.kucoin.com";
 const OK_CODE = "200000"; // прикладной «успех»; сам HTTP-статус при этом почти всегда 200
 
@@ -117,4 +119,26 @@ export function fetchAccounts(
   filter: { currency?: string; type?: KucoinAccountType } = {},
 ): Promise<KucoinAccount[]> {
   return signedRequest<KucoinAccount[]>("GET", "/api/v1/accounts", { query: filter });
+}
+
+// Какие типы счетов KuCoin входят в каждый тип счёта приложения:
+// "main" — funding-счёт (main), "spot" — торговые счета (trade + высокочастотный trade_hf).
+const ACCOUNT_TYPES: Record<"spot" | "main", KucoinAccountType[]> = {
+  main: ["main"],
+  spot: ["trade", "trade_hf"],
+};
+
+/**
+ * Суммарный баланс USDT на счетах указанного типа в micro-USDT (целое, USDT × 1 000 000).
+ * Берётся полный баланс (`balance`, включая заблокированное в ордерах), а не `available`.
+ * Один запрос с фильтром по валюте; фильтрация по типам счёта — локально,
+ * потому что API принимает лишь один type, а для "spot" нужны два.
+ * Если подходящих счетов нет — 0.
+ */
+export async function fetchUsdtBalanceMicro(account: "spot" | "main"): Promise<number> {
+  const types = ACCOUNT_TYPES[account];
+  const accounts = await fetchAccounts({ currency: "USDT" });
+  return accounts
+    .filter((a) => a.currency === "USDT" && types.includes(a.type))
+    .reduce((sum, a) => sum + decimalToMicro(a.balance), 0);
 }
