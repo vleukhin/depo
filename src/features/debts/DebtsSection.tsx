@@ -21,7 +21,7 @@ import {
 import { SectionCard } from "@/components/SectionCard";
 import { DeleteButton } from "@/components/DeleteButton";
 import { SortableRow, SortableRows } from "@/components/SortableRows";
-import { formatUsdt } from "@/lib/format";
+import { formatDate, formatUsdt } from "@/lib/format";
 import { useDebts, useDeleteDebt, useReorderDebts } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
 import { DebtForm } from "./DebtForm";
@@ -62,6 +62,7 @@ export function DebtsSection() {
               <TableRow>
                 <TableHead className="w-8" />
                 <TableHead>Менеджер</TableHead>
+                <TableHead>Дата</TableHead>
                 <TableHead className="text-right">Сумма</TableHead>
                 <TableHead>Сервис</TableHead>
                 <TableHead>Откуда взял</TableHead>
@@ -73,6 +74,9 @@ export function DebtsSection() {
               {debts.map((debt) => (
                 <SortableRow key={debt.id} id={debt.id}>
                   <TableCell className="font-medium">{debt.manager}</TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
+                    {formatDate(debt.date)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatUsdt(debt.amount)}
                   </TableCell>
@@ -102,7 +106,7 @@ export function DebtsSection() {
               ))}
               {!isLoading && debts.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     Пока нет записей
                   </TableCell>
                 </TableRow>

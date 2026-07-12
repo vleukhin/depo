@@ -49,6 +49,9 @@ function migrate(db: Database.Database) {
     "TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main'))",
     { backfillFromId: false },
   );
+  // Дата долга: существующие строки получают дату создания записи.
+  ensureColumn(db, "debts", "date", "TEXT", { backfillFromId: false });
+  db.exec("UPDATE debts SET date = date(created_at) WHERE date IS NULL");
 }
 
 function dropColumn(db: Database.Database, table: string, column: string) {

@@ -58,6 +58,9 @@ export const placementInput = z
 export const debtInput = z.object({
   manager: z.string().trim().min(1, "Укажите менеджера").max(200),
   amount,
+  date: z.iso
+    .date({ message: "Некорректная дата" })
+    .default(() => new Date().toISOString().slice(0, 10)),
   service: z
     .enum(SERVICES)
     .nullish()

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS debts (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   manager      TEXT    NOT NULL,             -- менеджер
   amount       INTEGER NOT NULL DEFAULT 0,   -- сумма (micro-USDT)
+  date         TEXT    NOT NULL DEFAULT (date('now')), -- дата долга (YYYY-MM-DD)
   service      TEXT    CHECK (service IS NULL OR service IN ('Lets','Mate','N-Obmen','Currex')), -- необязательно
   placement_id INTEGER,                      -- откуда взял (FK -> placements)
   source_text  TEXT,                         -- свободный текст, если размещение не выбрано

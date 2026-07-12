@@ -44,6 +44,7 @@ export interface Debt {
   id: number;
   manager: string;
   amount: number;
+  date: string; // дата долга (YYYY-MM-DD)
   service: Service | null;
   placement_id: number | null;
   placement_name: string | null; // подтягивается через LEFT JOIN

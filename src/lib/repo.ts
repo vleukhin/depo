@@ -33,6 +33,7 @@ interface DebtRow {
   id: number;
   manager: string;
   amount: number;
+  date: string;
   service: Service | null;
   placement_id: number | null;
   placement_name: string | null;
@@ -133,11 +134,12 @@ function getDebt(id: number): Debt {
 export function createDebt(input: DebtInput): Debt {
   const info = db
     .prepare(
-      "INSERT INTO debts (manager, amount, service, placement_id, source_text, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
+      "INSERT INTO debts (manager, amount, date, service, placement_id, source_text, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
     )
     .run(
       input.manager,
       toMicro(input.amount),
+      input.date,
       input.service,
       input.placement_id,
       input.source_text,
@@ -148,11 +150,12 @@ export function createDebt(input: DebtInput): Debt {
 export function updateDebt(id: number, input: DebtInput): Debt | null {
   const info = db
     .prepare(
-      "UPDATE debts SET manager = ?, amount = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
+      "UPDATE debts SET manager = ?, amount = ?, date = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
     )
     .run(
       input.manager,
       toMicro(input.amount),
+      input.date,
       input.service,
       input.placement_id,
       input.source_text,

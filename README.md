@@ -43,7 +43,7 @@ npm run start
 | ------------ | ------------------------------------------------------------------- |
 | `funds`      | name, amount                                                        |
 | `placements` | name, amount, kind (wallet/exchange), place, address (для wallet), exchange (KuCoin/Bitget, для exchange), exchange_account (spot/main), comment |
-| `debts`      | manager, amount, service (nullable: Lets/Mate/N-Obmen/Currex), placement_id (FK → placements, `ON DELETE SET NULL`), source_text, comment |
+| `debts`      | manager, amount, date (YYYY-MM-DD), service (nullable: Lets/Mate/N-Obmen/Currex), placement_id (FK → placements, `ON DELETE SET NULL`), source_text, comment |
 
 «Откуда взял» в долгах — либо ссылка на размещение (выпадающий список), либо свободный текст.
 
