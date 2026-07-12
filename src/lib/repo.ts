@@ -11,6 +11,8 @@ import type {
   PlacementKind,
   Exchange,
   ExchangeAccount,
+  TgDraft,
+  TgDraftStatus,
 } from "@/types";
 import type { FundInput, ManagerInput, PlacementInput, DebtInput } from "@/lib/validate";
 
@@ -136,6 +138,22 @@ export async function managerInUse(id: number): Promise<boolean> {
     args: [id],
   });
   return rs.rows.length > 0;
+}
+export async function getManager(id: number): Promise<Manager | null> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "SELECT * FROM managers WHERE id = ?", args: [id] });
+  return rs.rows[0] ? toManager(rs.rows[0]) : null;
+}
+/** Ищет менеджера по нику телеграм: регистронезависимо, с/без ведущего @. */
+export async function findManagerByTelegram(username: string): Promise<Manager | null> {
+  const normalized = username.trim().replace(/^@/, "").toLowerCase();
+  if (!normalized) return null;
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "SELECT * FROM managers WHERE telegram IS NOT NULL AND lower(ltrim(telegram, '@')) = ? LIMIT 1",
+    args: [normalized],
+  });
+  return rs.rows[0] ? toManager(rs.rows[0]) : null;
 }
 
 // ================= PLACEMENTS =================
@@ -333,4 +351,155 @@ export async function getSummary(): Promise<Summary> {
     diff: fromMicro(diff),
     balanced: diff === 0,
   };
+}
+
+// ================= TELEGRAM: ДЕДУП И ЧЕРНОВИКИ =================
+const toTgDraft = (r: Row): TgDraft => ({
+  id: Number(r.id),
+  chat_id: Number(r.chat_id),
+  status: r.status as TgDraftStatus,
+  source_text: (r.source_text as string | null) ?? null,
+  amount: r.amount === null ? null : fromMicro(Number(r.amount)),
+  manager_id: r.manager_id === null ? null : Number(r.manager_id),
+  manager_name: (r.manager_name as string | null) ?? null,
+  sender_username: (r.sender_username as string | null) ?? null,
+  destination: (r.destination as string | null) ?? null,
+  repay_source: (r.repay_source as string | null) ?? null,
+  service: (r.service as Service | null) ?? null,
+  comment: (r.comment as string | null) ?? null,
+  prompt_message_id: r.prompt_message_id === null ? null : Number(r.prompt_message_id),
+  confidence: (r.confidence as "high" | "low" | null) ?? null,
+  created_at: String(r.created_at),
+  updated_at: String(r.updated_at),
+});
+
+/** INSERT OR IGNORE по update_id: true — свежий update, false — уже обрабатывали. */
+export async function markTgUpdateProcessed(updateId: number): Promise<boolean> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "INSERT OR IGNORE INTO tg_updates (update_id) VALUES (?)",
+    args: [updateId],
+  });
+  return rs.rowsAffected > 0;
+}
+
+export interface TgDraftInput {
+  chat_id: number;
+  status: TgDraftStatus;
+  source_text: string | null;
+  amount: number | null; // десятичные USDT
+  manager_id: number | null;
+  manager_name: string | null;
+  sender_username: string | null;
+  destination: string | null;
+  repay_source: string | null;
+  service: Service | null;
+  comment: string | null;
+  confidence: "high" | "low" | null;
+}
+
+export async function createTgDraft(input: TgDraftInput): Promise<TgDraft> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql:
+      "INSERT INTO tg_drafts (chat_id, status, source_text, amount, manager_id, manager_name, " +
+      "sender_username, destination, repay_source, service, comment, confidence) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    args: [
+      input.chat_id,
+      input.status,
+      input.source_text,
+      input.amount === null ? null : toMicro(input.amount),
+      input.manager_id,
+      input.manager_name,
+      input.sender_username,
+      input.destination,
+      input.repay_source,
+      input.service,
+      input.comment,
+      input.confidence,
+    ],
+  });
+  return (await getTgDraft(Number(rs.lastInsertRowid)))!;
+}
+
+export async function getTgDraft(id: number): Promise<TgDraft | null> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "SELECT * FROM tg_drafts WHERE id = ?", args: [id] });
+  return rs.rows[0] ? toTgDraft(rs.rows[0]) : null;
+}
+
+/** Черновик, чей последний вопрос бота — сообщение messageId (для reply-уточнений). */
+export async function getTgDraftByPrompt(
+  chatId: number,
+  messageId: number,
+): Promise<TgDraft | null> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "SELECT * FROM tg_drafts WHERE chat_id = ? AND prompt_message_id = ? ORDER BY id DESC LIMIT 1",
+    args: [chatId, messageId],
+  });
+  return rs.rows[0] ? toTgDraft(rs.rows[0]) : null;
+}
+
+/** Самый свежий незавершённый черновик чата (фолбэк, когда ответ не reply). */
+export async function getLatestAwaitingTgDraft(chatId: number): Promise<TgDraft | null> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "SELECT * FROM tg_drafts WHERE chat_id = ? AND status LIKE 'awaiting_%' ORDER BY id DESC LIMIT 1",
+    args: [chatId],
+  });
+  return rs.rows[0] ? toTgDraft(rs.rows[0]) : null;
+}
+
+/** Частичное обновление черновика: пишутся только переданные поля. */
+export interface TgDraftPatch {
+  status?: TgDraftStatus;
+  amount?: number | null; // десятичные USDT
+  manager_id?: number | null;
+  manager_name?: string | null;
+  service?: Service | null;
+  comment?: string | null;
+  prompt_message_id?: number | null;
+}
+
+export async function updateTgDraft(id: number, patch: TgDraftPatch): Promise<TgDraft | null> {
+  const sets: string[] = [];
+  const args: (string | number | null)[] = [];
+  if (patch.status !== undefined) {
+    sets.push("status = ?");
+    args.push(patch.status);
+  }
+  if (patch.amount !== undefined) {
+    sets.push("amount = ?");
+    args.push(patch.amount === null ? null : toMicro(patch.amount));
+  }
+  if (patch.manager_id !== undefined) {
+    sets.push("manager_id = ?");
+    args.push(patch.manager_id);
+  }
+  if (patch.manager_name !== undefined) {
+    sets.push("manager_name = ?");
+    args.push(patch.manager_name);
+  }
+  if (patch.service !== undefined) {
+    sets.push("service = ?");
+    args.push(patch.service);
+  }
+  if (patch.comment !== undefined) {
+    sets.push("comment = ?");
+    args.push(patch.comment);
+  }
+  if (patch.prompt_message_id !== undefined) {
+    sets.push("prompt_message_id = ?");
+    args.push(patch.prompt_message_id);
+  }
+  if (sets.length === 0) return getTgDraft(id);
+  sets.push("updated_at = datetime('now')");
+  const db = await getClient();
+  await db.execute({
+    sql: `UPDATE tg_drafts SET ${sets.join(", ")} WHERE id = ?`,
+    args: [...args, id],
+  });
+  return getTgDraft(id);
 }

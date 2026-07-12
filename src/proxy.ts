@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_NAME, verifySessionToken } from "@/lib/auth";
 
-const PUBLIC_PATHS = new Set(["/login", "/api/login"]);
+// /api/telegram открыт от cookie-гейта: вебхук Telegram аутентифицируется
+// секрет-заголовком внутри самого роута (см. app/api/telegram/route.ts).
+const PUBLIC_PATHS = new Set(["/login", "/api/login", "/api/telegram"]);
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

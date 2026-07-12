@@ -174,4 +174,33 @@ CREATE TABLE IF NOT EXISTS debts (
   FOREIGN KEY (placement_id) REFERENCES placements(id) ON DELETE SET NULL,
   FOREIGN KEY (manager_id) REFERENCES managers(id) ON DELETE RESTRICT
 );
+
+-- Дедупликация обновлений Telegram: вебхук может доставить один update повторно.
+CREATE TABLE IF NOT EXISTS tg_updates (
+  update_id  INTEGER PRIMARY KEY,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Черновики долгов из Telegram-бота: состояние диалога между вызовами вебхука
+-- (serverless не хранит память между запросами). Суммы — micro-USDT.
+CREATE TABLE IF NOT EXISTS tg_drafts (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id           INTEGER NOT NULL,
+  status            TEXT    NOT NULL CHECK (status IN
+    ('awaiting_amount','awaiting_manager','awaiting_service','awaiting_confirmation','done','cancelled')),
+  source_text       TEXT,
+  amount            INTEGER,
+  manager_id        INTEGER,
+  manager_name      TEXT,
+  sender_username   TEXT,
+  destination       TEXT,
+  repay_source      TEXT,
+  service           TEXT    CHECK (service IS NULL OR service IN ('Lets','Mate','N-Obmen','Currex')),
+  comment           TEXT,
+  prompt_message_id INTEGER,
+  confidence        TEXT    CHECK (confidence IS NULL OR confidence IN ('high','low')),
+  created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (manager_id) REFERENCES managers(id) ON DELETE SET NULL
+);
 `;
