@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Pencil, RefreshCw } from "lucide-react";
+import { ExternalLink, Pencil, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +32,7 @@ import {
 } from "@/hooks/usePlacements";
 import type { Placement } from "@/types";
 import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
+import { TrxTopUpDialog } from "./TrxTopUpDialog";
 
 function AddressCell({ address }: { address: string | null }) {
   if (!address) return <span className="text-muted-foreground">—</span>;
@@ -58,6 +59,7 @@ export function PlacementsSection() {
   const check = useCheckBalances();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Placement | undefined>(undefined);
+  const [topUp, setTopUp] = useState<Placement | undefined>(undefined);
 
   function openCreate() {
     setEditing(undefined);
@@ -144,7 +146,24 @@ export function PlacementsSection() {
                         : undefined
                     }
                   >
-                    {p.trx_amount != null ? <TrxAmount value={p.trx_amount} /> : "—"}
+                    <span className="inline-flex items-center justify-end gap-1">
+                      {p.trx_amount != null ? <TrxAmount value={p.trx_amount} /> : "—"}
+                      {p.kind === "wallet" && isTronAddress(p.address) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-6"
+                          aria-label="Пополнить TRX"
+                          title="Пополнить TRX с биржи"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTopUp(p);
+                          }}
+                        >
+                          <Plus className="size-3.5" />
+                        </Button>
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground max-w-40">
                     {p.kind === "exchange" && p.exchange && p.exchange_account ? (
@@ -194,6 +213,15 @@ export function PlacementsSection() {
           <PlacementForm placement={editing} onDone={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      {topUp && (
+        <TrxTopUpDialog
+          key={topUp.id}
+          placement={topUp}
+          open
+          onOpenChange={(v) => !v && setTopUp(undefined)}
+        />
+      )}
     </SectionCard>
   );
 }

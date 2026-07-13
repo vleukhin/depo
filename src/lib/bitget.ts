@@ -10,7 +10,7 @@
 // Модуль намеренно ничего не знает о сущностях приложения (funds/placements/БД) —
 // это чистый клиент биржи. Достаточно ключа с правом Read-only.
 
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 
 import { decimalToMicro } from "@/lib/money";
 
@@ -203,4 +203,81 @@ export interface BitgetAccountBalance {
 /** Сводка по всем типам счетов в USDT: GET /api/v2/account/all-account-balance. */
 export function fetchAllAccountBalances(): Promise<BitgetAccountBalance[]> {
   return signedRequest<BitgetAccountBalance[]>("GET", "/api/v2/account/all-account-balance");
+}
+
+// ================= ВЫВОД TRX =================
+
+interface BitgetCoinChain {
+  chain: string; // имя сети, напр. "TRX" (TRON)
+  withdrawable?: string; // "true" / "false"
+  withdrawFee?: string; // комиссия сети за вывод
+  minWithdrawAmount?: string; // минимальная сумма вывода
+}
+
+interface BitgetCoin {
+  coin: string;
+  chains: BitgetCoinChain[];
+}
+
+const toNumberOrNull = (value: string | undefined): number | null => {
+  if (value === undefined || value.trim() === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+/**
+ * Параметры вывода TRX в сети TRON: GET /api/v2/spot/public/coins?coin=TRX.
+ * Из списка сетей монеты берём запись сети TRON (обычно `chain === "TRX"`),
+ * иначе — первую доступную для вывода. Возвращает имя сети (для параметра
+ * `chain` при выводе), минимальную сумму и комиссию (или null, если не указаны).
+ */
+export async function fetchTrxWithdrawInfo(): Promise<{
+  chain: string;
+  minAmount: number | null;
+  fee: number | null;
+}> {
+  const coins = await signedRequest<BitgetCoin[]>("GET", "/api/v2/spot/public/coins", {
+    query: { coin: "TRX" },
+  });
+  const chains = coins.find((c) => c.coin === "TRX")?.chains ?? [];
+  const chain =
+    chains.find((c) => c.chain.toUpperCase() === "TRX") ??
+    chains.find((c) => c.withdrawable === "true") ??
+    chains[0];
+  if (!chain) {
+    throw new Error("Bitget: сеть TRON для TRX недоступна");
+  }
+  return {
+    chain: chain.chain,
+    minAmount: toNumberOrNull(chain.minWithdrawAmount),
+    fee: toNumberOrNull(chain.withdrawFee),
+  };
+}
+
+/**
+ * On-chain вывод TRX со спотового счёта на внешний адрес:
+ * POST /api/v2/spot/wallet/withdrawal. `size` — десятичная строка в TRX (не micro),
+ * `chain` — имя сети из fetchTrxWithdrawInfo. Возвращает orderId созданной заявки.
+ * Требует API-ключ с правом Withdraw (и, как правило, адрес в whitelist Bitget).
+ */
+export async function withdrawTrx(params: {
+  address: string;
+  amount: number;
+  chain: string;
+}): Promise<{ orderId: string }> {
+  const data = await signedRequest<{ orderId: string; clientOid: string }>(
+    "POST",
+    "/api/v2/spot/wallet/withdrawal",
+    {
+      body: {
+        coin: "TRX",
+        transferType: "on_chain",
+        address: params.address,
+        chain: params.chain,
+        size: String(params.amount),
+        clientOid: randomUUID(),
+      },
+    },
+  );
+  return { orderId: data.orderId };
 }

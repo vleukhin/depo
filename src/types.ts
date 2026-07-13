@@ -40,6 +40,17 @@ export interface CheckBalancesResult {
   skipped: number; // строки-кошельки без валидного TRON-адреса
 }
 
+// Данные для попапа пополнения TRX с биржи. Суммы — десятичные TRX.
+export interface ExchangeTrxInfo {
+  balance: number; // баланс TRX на спотовом счёте биржи
+  fee: number | null; // комиссия сети за вывод, null — неизвестна
+  min: number | null; // минимальная сумма вывода, null — неизвестна
+}
+
+export interface WithdrawTrxResult {
+  orderId: string; // id заявки на вывод, созданной биржей
+}
+
 export interface Manager {
   id: number;
   name: string;

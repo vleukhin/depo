@@ -83,6 +83,15 @@ export const reorderInput = z.object({
   ids: z.array(z.number().int().positive()).min(1),
 });
 
+// Ввод для вывода TRX с биржи на адрес кошелька. Адрес получателя сервер берёт
+// из сохранённого размещения по placementId — клиент шлёт только его id. Счёт-
+// источник фиксирован (spot), поэтому в схему не выносится.
+export const trxWithdrawInput = z.object({
+  placementId: z.number({ message: "Некорректное размещение" }).int().positive(),
+  exchange: z.enum(EXCHANGES, { message: "Некорректная биржа" }),
+  amount: z.number({ message: "Укажите сумму" }).positive("Сумма должна быть больше нуля"),
+});
+
 // Результат разбора заявки на долг из Telegram (LLM возвращает JSON по этой схеме;
 // regex-фолбэк собирает тот же контракт). Суммы — десятичные USDT.
 export const parsedRequest = z.object({
@@ -101,6 +110,7 @@ export type FundInput = z.infer<typeof fundInput>;
 export type ManagerInput = z.infer<typeof managerInput>;
 export type PlacementInput = z.infer<typeof placementInput>;
 export type DebtInput = z.infer<typeof debtInput>;
+export type TrxWithdrawInput = z.infer<typeof trxWithdrawInput>;
 export type ParsedRequestOutput = z.infer<typeof parsedRequest>;
 
 // input-типы для react-hook-form (до zod-трансформаций).

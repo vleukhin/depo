@@ -162,6 +162,11 @@ export async function listPlacements(): Promise<Placement[]> {
   const rs = await db.execute("SELECT * FROM placements ORDER BY sort_order ASC, id ASC");
   return rs.rows.map(toPlacement);
 }
+export async function getPlacement(id: number): Promise<Placement | null> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "SELECT * FROM placements WHERE id = ?", args: [id] });
+  return rs.rows[0] ? toPlacement(rs.rows[0]) : null;
+}
 export async function createPlacement(input: PlacementInput): Promise<Placement> {
   const db = await getClient();
   const rs = await db.execute({
