@@ -68,13 +68,6 @@ async function startDraft(msg: TgMessage, text: string): Promise<void> {
   const amount =
     parsed.amount ?? (parsed.amount_candidates.length === 1 ? parsed.amount_candidates[0] : null);
 
-  // Распознанные детали — в комментарий будущего долга (сервис — отдельное поле).
-  const commentParts = [
-    parsed.destination,
-    parsed.repay_source ? `верну с ${parsed.repay_source}` : null,
-    parsed.manager ? `для ${parsed.manager}` : null,
-  ].filter(Boolean);
-
   const status: TgDraftStatus =
     amount === null
       ? "awaiting_amount"
@@ -85,7 +78,8 @@ async function startDraft(msg: TgMessage, text: string): Promise<void> {
   const draft = await createTgDraft({
     chat_id: msg.chat.id,
     status,
-    source_text: text,
+    // Оригинальный текст форварда сохраняем в comment (в source_text долга не пишем).
+    source_text: null,
     amount,
     manager_id: resolved.managerId,
     manager_name: resolved.managerName,
@@ -93,7 +87,7 @@ async function startDraft(msg: TgMessage, text: string): Promise<void> {
     destination: parsed.destination,
     repay_source: parsed.repay_source,
     service: parsed.service,
-    comment: commentParts.length ? commentParts.join("; ") : null,
+    comment: text,
     confidence: parsed.confidence,
   });
 
@@ -207,7 +201,8 @@ async function handleCallback(cb: TgCallbackQuery): Promise<void> {
         date: new Date().toISOString().slice(0, 10),
         service: draft.service,
         placement_id: null,
-        source_text: draft.source_text,
+        // Оригинальный текст форварда — в comment; source_text не заполняем.
+        source_text: null,
         comment: draft.comment,
       });
       await updateTgDraft(draft.id, { status: "done" });
