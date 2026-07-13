@@ -20,7 +20,7 @@ npm run lint     # ESLint (flat config, eslint-config-next core-web-vitals + typ
 
 There is no test framework configured.
 
-Before running: copy `.env.example` to `.env`. `APP_PASSWORD` is mandatory — without it login is completely closed. `AUTH_SECRET` signs session cookies; `TRONGRID_API_KEY` is optional (raises TronGrid rate limits); `KUCOIN_*`/`BITGET_*` (key/secret/passphrase) enable exchange balance checks. **Database**: with `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` set the app uses Turso (prod); unset, it falls back to a local SQLite file at `DB_PATH` (default `data/depo.db`, auto-created, gitignored) — the normal dev setup. See `DEPLOY.md` for the Vercel + Turso deploy.
+Before running: copy `.env.example` to `.env`. `APP_PASSWORD` is mandatory — without it login is completely closed. `AUTH_SECRET` signs session cookies; `TRONGRID_API_KEY` is optional (raises TronGrid rate limits); `KUCOIN_*`/`BITGET_*` (key/secret/passphrase) enable exchange balance checks; `EXCHANGE_PROXY_URL` (optional) routes **only** the exchange (Bitget/KuCoin) requests through an HTTP proxy with a static IP so it can be whitelisted on the exchange key — see `lib/proxy.ts` and the "Static IP" note in `DEPLOY.md` (TronGrid/Telegram/DB stay direct). **Database**: with `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` set the app uses Turso (prod); unset, it falls back to a local SQLite file at `DB_PATH` (default `data/depo.db`, auto-created, gitignored) — the normal dev setup. See `DEPLOY.md` for the Vercel + Turso deploy.
 
 ## Next.js 16 specifics used here
 

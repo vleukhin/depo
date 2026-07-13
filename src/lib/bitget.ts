@@ -12,7 +12,10 @@
 
 import { createHmac, randomUUID } from "node:crypto";
 
+import type { Dispatcher } from "undici";
+
 import { decimalToMicro } from "@/lib/money";
+import { getExchangeDispatcher } from "@/lib/proxy";
 
 const BASE_URL = process.env.BITGET_API_URL ?? "https://api.bitget.com";
 const OK_CODE = "00000"; // прикладной «успех» в конверте ответа
@@ -87,7 +90,10 @@ export async function signedRequest<T>(
       body: method === "GET" ? undefined : body,
       signal: AbortSignal.timeout(10_000),
       cache: "no-store",
-    });
+      // dispatcher — опция undici (глобальный fetch на нём и построен); в типе
+      // RequestInit её нет, поэтому приведение. undefined -> прямой fetch.
+      dispatcher: getExchangeDispatcher(),
+    } as RequestInit & { dispatcher?: Dispatcher });
     if (res.status !== 429 || attempt >= 3) break;
     attempt++;
     await sleep(1000 * attempt); // 1с, 2с, 3с
