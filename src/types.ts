@@ -70,3 +70,49 @@ export interface Summary {
   diff: number; // (размещено + долги) − депо: >0 избыток, <0 недостача
   balanced: boolean;
 }
+
+// --- Telegram-бот: черновики долгов ---
+
+export const TG_DRAFT_STATUSES = [
+  "awaiting_amount",
+  "awaiting_manager",
+  "awaiting_service",
+  "awaiting_confirmation",
+  "done",
+  "cancelled",
+] as const;
+export type TgDraftStatus = (typeof TG_DRAFT_STATUSES)[number];
+
+// Черновик долга из пересланного боту сообщения. Диалог с ботом идёт через
+// serverless-вебхук, поэтому всё состояние живёт в БД. Суммы — десятичные USDT.
+export interface TgDraft {
+  id: number;
+  chat_id: number;
+  status: TgDraftStatus;
+  source_text: string | null; // оригинальный текст форварда (-> debts.source_text)
+  amount: number | null; // NULL — сумма ещё не распознана
+  manager_id: number | null; // FK -> managers, NULL — менеджер не определён
+  manager_name: string | null; // кэш имени для сводки
+  sender_username: string | null; // ник автора форварда (для сопоставления)
+  destination: string | null; // «рапира» и т.п.
+  repay_source: string | null; // «кукойн» и т.п.
+  service: Service | null;
+  comment: string | null; // собранный комментарий (-> debts.comment)
+  prompt_message_id: number | null; // id сообщения бота с вопросом/клавиатурой
+  confidence: "high" | "low" | null; // уверенность парсера
+  created_at: string;
+  updated_at: string;
+}
+
+// Результат разбора текста заявки (LLM или regex-фолбэк). Суммы — десятичные USDT.
+export interface ParsedRequest {
+  amount: number | null; // однозначно распознанная сумма
+  amount_candidates: number[]; // кандидаты, если чисел несколько
+  manager: string | null; // best-effort имя из текста («для Питера») — только подсказка
+  destination: string | null; // куда отправить («рапира»)
+  repay_source: string | null; // откуда вернут («кукойн»)
+  service: Service | null; // только при явном совпадении с SERVICES
+  needs_clarification: boolean;
+  clarification_field: "amount" | "manager" | null;
+  confidence: "high" | "low";
+}

@@ -83,10 +83,25 @@ export const reorderInput = z.object({
   ids: z.array(z.number().int().positive()).min(1),
 });
 
+// Результат разбора заявки на долг из Telegram (LLM возвращает JSON по этой схеме;
+// regex-фолбэк собирает тот же контракт). Суммы — десятичные USDT.
+export const parsedRequest = z.object({
+  amount: z.number().min(0).nullable(),
+  amount_candidates: z.array(z.number().min(0)),
+  manager: z.string().trim().max(200).nullable(),
+  destination: z.string().trim().max(200).nullable(),
+  repay_source: z.string().trim().max(200).nullable(),
+  service: z.enum(SERVICES).nullable(),
+  needs_clarification: z.boolean(),
+  clarification_field: z.enum(["amount", "manager"]).nullable(),
+  confidence: z.enum(["high", "low"]),
+});
+
 export type FundInput = z.infer<typeof fundInput>;
 export type ManagerInput = z.infer<typeof managerInput>;
 export type PlacementInput = z.infer<typeof placementInput>;
 export type DebtInput = z.infer<typeof debtInput>;
+export type ParsedRequestOutput = z.infer<typeof parsedRequest>;
 
 // input-типы для react-hook-form (до zod-трансформаций).
 export type FundFormValues = z.input<typeof fundInput>;
