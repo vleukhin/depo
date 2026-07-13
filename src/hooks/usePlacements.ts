@@ -27,6 +27,8 @@ export function useCheckBalances() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["placements"] });
       qc.invalidateQueries({ queryKey: ["summary"] });
+      // Сервер апсертит снимок TRX за сегодня — обновляем график (все периоды по префиксу).
+      qc.invalidateQueries({ queryKey: ["trx-snapshots"] });
     },
   });
 }

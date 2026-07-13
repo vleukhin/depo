@@ -179,6 +179,15 @@ CREATE TABLE IF NOT EXISTS debts (
   FOREIGN KEY (manager_id) REFERENCES managers(id) ON DELETE RESTRICT
 );
 
+-- Ежедневные снимки суммарного TRX по всем размещениям. Сумма — SUN (micro-TRX).
+-- date — календарный день по МСК (UTC+3 без перехода на летнее время).
+CREATE TABLE IF NOT EXISTS trx_snapshots (
+  date       TEXT PRIMARY KEY,
+  trx_amount INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Дедупликация обновлений Telegram: вебхук может доставить один update повторно.
 CREATE TABLE IF NOT EXISTS tg_updates (
   update_id  INTEGER PRIMARY KEY,

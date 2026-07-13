@@ -78,8 +78,15 @@ export interface Summary {
   total_funds: number;
   total_placements: number;
   total_debts: number;
+  total_trx: number; // суммарный TRX по всем размещениям (информационно, вне сверки)
   diff: number; // (размещено + долги) − депо: >0 избыток, <0 недостача
   balanced: boolean;
+}
+
+// Снимок суммарного TRX за день. Сумма — десятичные TRX.
+export interface TrxSnapshot {
+  date: string; // календарный день по МСК (YYYY-MM-DD)
+  trx_amount: number;
 }
 
 // --- Telegram-бот: черновики долгов ---

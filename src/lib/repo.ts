@@ -13,6 +13,7 @@ import type {
   ExchangeAccount,
   TgDraft,
   TgDraftStatus,
+  TrxSnapshot,
 } from "@/types";
 import type { FundInput, ManagerInput, PlacementInput, DebtInput } from "@/lib/validate";
 
@@ -348,14 +349,43 @@ export async function getSummary(): Promise<Summary> {
   const funds = await one("funds");
   const placements = await one("placements");
   const debts = await one("debts");
+  // TRX информационный, в сверку не входит (SUM пропускает NULL непроверенных строк).
+  const trx = await db.execute("SELECT COALESCE(SUM(trx_amount), 0) AS s FROM placements");
   const diff = placements + debts - funds;
   return {
     total_funds: fromMicro(funds),
     total_placements: fromMicro(placements),
     total_debts: fromMicro(debts),
+    total_trx: fromMicro(Number(trx.rows[0].s)),
     diff: fromMicro(diff),
     balanced: diff === 0,
   };
+}
+
+// ================= TRX SNAPSHOTS =================
+const toTrxSnapshot = (r: Row): TrxSnapshot => ({
+  date: String(r.date),
+  trx_amount: fromMicro(Number(r.trx_amount)),
+});
+
+/** Апсертит снимок за сегодня (по МСК): сумма trx_amount всех размещений. */
+export async function upsertTodayTrxSnapshot(): Promise<void> {
+  const db = await getClient();
+  await db.execute(
+    "INSERT INTO trx_snapshots (date, trx_amount) " +
+      "VALUES (date(datetime('now','+3 hours')), (SELECT COALESCE(SUM(trx_amount), 0) FROM placements)) " +
+      "ON CONFLICT(date) DO UPDATE SET trx_amount = excluded.trx_amount, updated_at = datetime('now')",
+  );
+}
+
+/** Снимки за последние N дней (по МСК), по возрастанию даты. */
+export async function listTrxSnapshots(days: number): Promise<TrxSnapshot[]> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "SELECT date, trx_amount FROM trx_snapshots WHERE date >= date(datetime('now','+3 hours'), ?) ORDER BY date ASC",
+    args: [`-${days - 1} days`],
+  });
+  return rs.rows.map(toTrxSnapshot);
 }
 
 // ================= TELEGRAM: ДЕДУП И ЧЕРНОВИКИ =================

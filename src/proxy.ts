@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_NAME, verifySessionToken } from "@/lib/auth";
 
-// /api/telegram открыт от cookie-гейта: вебхук Telegram аутентифицируется
-// секрет-заголовком внутри самого роута (см. app/api/telegram/route.ts).
-const PUBLIC_PATHS = new Set(["/login", "/api/login", "/api/telegram"]);
+// /api/telegram и /api/cron/snapshot открыты от cookie-гейта: вебхук Telegram
+// аутентифицируется секрет-заголовком внутри самого роута (см. app/api/telegram/route.ts),
+// крон-роут — заголовком Authorization: Bearer <CRON_SECRET> (см. app/api/cron/snapshot/route.ts).
+const PUBLIC_PATHS = new Set(["/login", "/api/login", "/api/telegram", "/api/cron/snapshot"]);
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

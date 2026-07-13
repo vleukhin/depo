@@ -25,3 +25,13 @@ export function formatDate(value: string | Date): string {
   const d = typeof value === "string" ? new Date(`${value}T00:00:00`) : value;
   return dateFormatter.format(d);
 }
+
+const shortDateFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+});
+
+/** "2026-07-12" -> "12.07" (подписи оси X графика). */
+export function formatDateShort(value: string): string {
+  return shortDateFormatter.format(new Date(`${value}T00:00:00`));
+}

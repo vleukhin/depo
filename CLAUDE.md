@@ -61,7 +61,7 @@ Amounts are stored as **integer micro-USDT** (USDT × 1 000 000) for exact recon
 ### API conventions
 
 - Handlers wrap their body in `handle()` from `lib/api-helpers.ts`. Helpers **throw `NextResponse`** for error short-circuits (`notFound()`, `parseId()`, `parseBody()`); `handle()` catches thrown responses and `ZodError`s and turns everything into `{ error: "<русское сообщение>" }` JSON.
-- Endpoints: CRUD `GET/POST /api/<entity>`, `PUT/DELETE /api/<entity>/[id]`; `POST /api/{placements,debts}/reorder` (body `{ ids: number[] }` — array position becomes `sort_order`); `GET /api/summary`; `POST /api/placements/check-balances`; `POST /api/login`, `POST /api/logout`.
+- Endpoints: CRUD `GET/POST /api/<entity>`, `PUT/DELETE /api/<entity>/[id]`; `POST /api/{placements,debts}/reorder` (body `{ ids: number[] }` — array position becomes `sort_order`); `GET /api/summary`; `POST /api/placements/check-balances`; `GET /api/trx-snapshots?days=N` (TRX history for the dashboard chart); `GET /api/cron/snapshot` (Vercel Cron, authenticated by `Authorization: Bearer <CRON_SECRET>` inside the route — the path is in `PUBLIC_PATHS` of `src/proxy.ts`); `POST /api/login`, `POST /api/logout`.
 
 ### Client conventions
 
@@ -76,7 +76,9 @@ Single password (`APP_PASSWORD`); session is an HMAC-signed `exp.signature` toke
 
 ### TRON balance check
 
-`POST /api/placements/check-balances` iterates placements (wallets by TRON address, exchange rows by KuCoin/Bitget API) and **overwrites** their `amount` with the USDT balance and `trx_amount` with the native TRX balance via `updateBalancesFromChain` (`chain_checked_at` records when). TRX is informational — shown in its own column, not part of the USDT reconciliation. `lib/tron.ts` deliberately calls `balanceOf(address)` on the USDT contract via TronGrid's `triggerconstantcontract` instead of the accounts endpoint — the accounts endpoint returns empty data for unactivated addresses even when they hold USDT. It retries on 429 and paces requests (shorter pause when `TRONGRID_API_KEY` is set).
+The check-balances logic lives in `lib/check-balances.ts` (`checkAllBalances()`), shared by two routes: `POST /api/placements/check-balances` (the UI button) and `GET /api/cron/snapshot` (daily Vercel Cron, 20:00 UTC = 23:00 MSK, see `vercel.json` and `DEPLOY.md`). It iterates placements (wallets by TRON address, exchange rows by KuCoin/Bitget API) and **overwrites** their `amount` with the USDT balance and `trx_amount` with the native TRX balance via `updateBalancesFromChain` (`chain_checked_at` records when). TRX is informational — shown in its own column, not part of the USDT reconciliation. `lib/tron.ts` deliberately calls `balanceOf(address)` on the USDT contract via TronGrid's `triggerconstantcontract` instead of the accounts endpoint — the accounts endpoint returns empty data for unactivated addresses even when they hold USDT. It retries on 429 and paces requests (shorter pause when `TRONGRID_API_KEY` is set).
+
+After every run `checkAllBalances()` upserts the day's total-TRX snapshot into `trx_snapshots` (date PK computed in MSK via `date(datetime('now','+3 hours'))`, amount in SUN; last write of the day wins). The dashboard chart (`features/dashboard/TrxChartCard.tsx`, recharts) reads it through `GET /api/trx-snapshots?days=N`.
 
 ## Adding a field or entity — the cross-cutting checklist
 

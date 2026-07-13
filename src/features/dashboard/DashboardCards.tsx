@@ -1,9 +1,10 @@
 "use client";
 
-import { Wallet, MapPin, HandCoins, Scale } from "lucide-react";
+import { Wallet, MapPin, HandCoins, Scale, Coins } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { UsdtAmount } from "@/components/UsdtAmount";
+import { TrxAmount } from "@/components/TrxAmount";
 import { useSummary } from "@/hooks/useSummary";
 
 function StatCard({
@@ -72,7 +73,7 @@ export function DashboardCards() {
   const balanced = data?.balanced ?? true;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <StatCard
         icon={<Wallet className="size-5" />}
         label="Всего в депо"
@@ -100,6 +101,12 @@ export function DashboardCards() {
               : "Недостача"
         }
         tone={diff >= 0 ? "ok" : "bad"}
+      />
+      <StatCard
+        icon={<Coins className="size-5" />}
+        label="Всего TRX"
+        value={<TrxAmount value={data?.total_trx ?? 0} />}
+        hint="Не входит в сверку"
       />
     </div>
   );

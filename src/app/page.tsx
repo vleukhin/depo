@@ -1,4 +1,5 @@
 import { DashboardCards } from "@/features/dashboard/DashboardCards";
+import { TrxChartCard } from "@/features/dashboard/TrxChartCard";
 import { FundsSection } from "@/features/funds/FundsSection";
 import { PlacementsSection } from "@/features/placements/PlacementsSection";
 import { DebtsSection } from "@/features/debts/DebtsSection";
@@ -16,6 +17,8 @@ export default function Home() {
       </header>
 
       <DashboardCards />
+
+      <TrxChartCard />
 
       <div className="space-y-6">
         <FundsSection />
