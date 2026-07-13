@@ -81,6 +81,7 @@ git push origin master
    | `KUCOIN_API_KEY` / `KUCOIN_API_SECRET` / `KUCOIN_API_PASSPHRASE` | read-only ключ KuCoin |
    | `BITGET_API_KEY` / `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` | ключ Bitget (read-only; для вывода TRX — с правом Withdraw) |
    | `EXCHANGE_PROXY_URL` | опционально — прокси со статическим IP для бирж (см. «Статический IP…» ниже) |
+   | `EXCHANGE_PROXY_CA` / `EXCHANGE_PROXY_SERVERNAME` | опционально — для HTTPS-прокси с самоподписанным сертификатом |
 
    Значения берите из вашего локального `.env`. **Вводите их только в интерфейсе Vercel**
    (не коммитьте в репозиторий).
@@ -141,18 +142,103 @@ IP-allowlist требует. Тогда пускайте биржевые зап
 Bitget/KuCoin пойдут через прокси (TronGrid, Telegram и БД Turso — напрямую, чтобы не
 зависеть от аптайма прокси). Не задан — обычный прямой fetch (режим локальной разработки).
 
-1. Поднимите прокси со статическим IP. Через него идут **подписанные** запросы с вашим
-   API-ключом, поэтому прокси должен быть **вашим**, а не сторонним посредником:
-   - свой дешёвый VPS с `tinyproxy` или `squid` (рекомендуется), либо
-   - сервис вроде Fixie / QuotaGuard Static.
-   Ограничьте доступ к прокси (пароль в URL и/или firewall) — это шлюз к ключу с Withdraw.
-2. В Vercel (Settings → Environment Variables) задайте
-   `EXCHANGE_PROXY_URL=http://user:pass@host:port` и передеплойте.
-3. В Bitget впишите IP прокси в whitelist ключа (для ключа с правом Withdraw). Проверьте
-   выводом малой суммы через `withdraw-trx`.
+Через прокси идут **подписанные** запросы с вашим API-ключом (в т.ч. с правом Withdraw),
+поэтому прокси должен быть **вашим**, а не сторонним посредником. Ниже — HTTPS-прокси на
+своём VPS: TLS шифрует и пароль прокси в транзите (содержимое запроса к бирже и так в
+end-to-end TLS внутри CONNECT-туннеля). Прокси должен быть в регионе, откуда биржа доступна
+(KuCoin недоступен из США — см. «Регион серверных функций»).
 
-> Прокси должен быть в регионе, откуда биржа доступна (KuCoin недоступен из США — см.
-> «Регион серверных функций»).
+Схема: `tinyproxy` слушает localhost и требует пароль, а `stunnel` терминирует TLS снаружи
+и проксирует поток в tinyproxy. Так undici ходит по `https://…`, а сам tinyproxy TLS не умеет.
+
+### 1. VPS и tinyproxy (только localhost)
+
+```bash
+sudo apt update && sudo apt install -y tinyproxy stunnel4
+```
+
+В `/etc/tinyproxy/tinyproxy.conf`:
+
+```conf
+Port 8888
+Listen 127.0.0.1                 # только локально — наружу торчит stunnel, не tinyproxy
+BasicAuth depo ДЛИННЫЙ_ПАРОЛЬ    # openssl rand -hex 24
+ConnectPort 443                  # CONNECT только на 443; уберите строки про 563
+# закомментируйте все `Allow ...` — IP Vercel динамические, доступ гейтит пароль
+```
+
+```bash
+sudo systemctl enable --now tinyproxy
+```
+
+### 2. Самоподписанный сертификат (IP + DNS-метка в SAN)
+
+Домена нет, поэтому сертификат самоподписанный. В SAN кладём **и** IP VPS, **и** DNS-метку
+(`depo-proxy`): по этой метке приложение проверяет TLS, т.к. undici не умеет ставить SNI на
+голый IP.
+
+```bash
+sudo openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+  -keyout /etc/stunnel/proxy-key.pem -out /etc/stunnel/proxy-cert.pem \
+  -subj "/CN=depo-proxy" \
+  -addext "subjectAltName=DNS:depo-proxy,IP:IP_ВПС"
+sudo chmod 600 /etc/stunnel/proxy-key.pem
+```
+
+### 3. stunnel: TLS снаружи → tinyproxy на localhost
+
+`/etc/stunnel/stunnel.conf`:
+
+```ini
+[https-proxy]
+accept  = 0.0.0.0:8443
+connect = 127.0.0.1:8888
+cert    = /etc/stunnel/proxy-cert.pem
+key     = /etc/stunnel/proxy-key.pem
+```
+
+```bash
+sudo sed -i 's/^ENABLED=0/ENABLED=1/' /etc/default/stunnel4   # включить автозапуск
+sudo systemctl enable --now stunnel4
+```
+
+Файрвол — наружу только SSH и порт stunnel:
+
+```bash
+sudo ufw allow OpenSSH && sudo ufw allow 8443/tcp && sudo ufw enable
+```
+
+### 4. Проверка (со своего ноутбука)
+
+```bash
+# через прокси (метка depo-proxy резолвится в IP через --resolve) -> JSON времени Bitget:
+curl --proxy https://depo:ПАРОЛЬ@depo-proxy:8443 \
+     --proxy-cacert proxy-cert.pem \
+     --resolve depo-proxy:8443:IP_ВПС \
+     https://api.bitget.com/api/v2/public/time
+```
+
+(`proxy-cert.pem` — скопируйте с VPS.) Успех = JSON, а не ошибка TLS/407.
+
+### 5. Переменные в Vercel и whitelist
+
+В Vercel (Settings → Environment Variables), scope Production + Preview:
+
+| Переменная | Значение |
+| --- | --- |
+| `EXCHANGE_PROXY_URL` | `https://depo:ПАРОЛЬ@IP_ВПС:8443` (в URL — именно IP) |
+| `EXCHANGE_PROXY_CA` | содержимое `proxy-cert.pem` (можно одной строкой, заменив переносы на `\n`) |
+| `EXCHANGE_PROXY_SERVERNAME` | `depo-proxy` (DNS-метка из SAN сертификата) |
+
+Передеплойте. Затем впишите **IP_ВПС** в whitelist ключа Bitget (для ключа с правом
+Withdraw) и проверьте выводом малой суммы через `withdraw-trx`.
+
+> **Проще, если есть домен.** Направьте A-запись (напр. `proxy.ваш-домен`) на IP VPS,
+> получите сертификат Let's Encrypt (`certbot`) — тогда `EXCHANGE_PROXY_CA` и
+> `EXCHANGE_PROXY_SERVERNAME` не нужны, а `EXCHANGE_PROXY_URL=https://user:pass@proxy.ваш-домен:8443`.
+
+> **Хардининг.** `fail2ban` от перебора пароля; ограничьте права ключа Bitget минимально
+> необходимым; храните секреты только в переменных Vercel.
 
 ## Важные замечания
 

@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SectionCard } from "@/components/SectionCard";
+import { CopyButton } from "@/components/CopyButton";
 import { DeleteButton } from "@/components/DeleteButton";
 import { SortableRow, SortableRows } from "@/components/SortableRows";
 import { UsdtAmount } from "@/components/UsdtAmount";
@@ -34,21 +35,40 @@ import type { Placement } from "@/types";
 import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
 import { TrxTopUpDialog } from "./TrxTopUpDialog";
 
+// Адрес целиком; первые и последние 6 символов выделены на фоне приглушённой середины.
+function AddressText({ value }: { value: string }) {
+  if (value.length <= 12) {
+    return <span className="text-foreground font-semibold">{value}</span>;
+  }
+  return (
+    <span className="whitespace-nowrap">
+      <span className="text-foreground font-semibold">{value.slice(0, 6)}</span>
+      {value.slice(6, -6)}
+      <span className="text-foreground font-semibold">{value.slice(-6)}</span>
+    </span>
+  );
+}
+
 function AddressCell({ address }: { address: string | null }) {
   if (!address) return <span className="text-muted-foreground">—</span>;
-  if (!isTronAddress(address)) return <>{address}</>;
   return (
-    <a
-      href={`https://tronscan.org/#/address/${address.trim()}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      className="inline-flex items-center gap-1 hover:text-foreground hover:underline underline-offset-2"
-      title="Открыть в Tronscan"
-    >
-      <span className="max-w-36 truncate">{address}</span>
-      <ExternalLink className="size-3 shrink-0" />
-    </a>
+    <span className="inline-flex items-center gap-1">
+      {isTronAddress(address) ? (
+        <a
+          href={`https://tronscan.org/#/address/${address.trim()}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="hover:underline underline-offset-2"
+          title="Открыть в Tronscan"
+        >
+          <AddressText value={address} />
+        </a>
+      ) : (
+        <AddressText value={address} />
+      )}
+      <CopyButton value={address} label="Скопировать адрес" successMessage="Адрес скопирован" />
+    </span>
   );
 }
 
@@ -165,7 +185,7 @@ export function PlacementsSection() {
                       )}
                     </span>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground max-w-40">
+                  <TableCell className="font-mono text-xs text-muted-foreground">
                     {p.kind === "exchange" && p.exchange && p.exchange_account ? (
                       <span className="font-sans">
                         {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
