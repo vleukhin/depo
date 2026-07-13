@@ -21,9 +21,13 @@ async function createAndInit(): Promise<Client> {
   const { url, authToken } = resolveUrl();
   // intMode "number": суммы в micro-USDT укладываются в безопасный диапазон Number.
   const client = createClient({ url, authToken, intMode: "number" });
-  await client.execute("PRAGMA journal_mode = WAL");
+  // WAL и busy_timeout — настройки локального файлового SQLite; на Turso (libSQL-сервер)
+  // эти PRAGMA запрещены и падают с SQL_PARSE_ERROR. Применяем их только к file:-драйверу.
+  if (url.startsWith("file:")) {
+    await client.execute("PRAGMA journal_mode = WAL");
+    await client.execute("PRAGMA busy_timeout = 5000"); // сериализовать параллельные процессы (напр. воркеры сборки)
+  }
   await client.execute("PRAGMA foreign_keys = ON");
-  await client.execute("PRAGMA busy_timeout = 5000"); // сериализовать параллельные процессы (напр. воркеры сборки)
   await initSchema(client);
   await migrate(client);
   return client;
