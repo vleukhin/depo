@@ -18,10 +18,13 @@ export default function Home() {
 
       <DashboardCards />
 
-      <TrxChartCard />
+      {/* На широких экранах «Средства» и график TRX — рядом. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <FundsSection />
+        <TrxChartCard />
+      </div>
 
       <div className="space-y-6">
-        <FundsSection />
         <PlacementsSection />
         <DebtsSection />
       </div>

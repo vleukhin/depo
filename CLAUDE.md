@@ -61,7 +61,7 @@ Amounts are stored as **integer micro-USDT** (USDT × 1 000 000) for exact recon
 ### API conventions
 
 - Handlers wrap their body in `handle()` from `lib/api-helpers.ts`. Helpers **throw `NextResponse`** for error short-circuits (`notFound()`, `parseId()`, `parseBody()`); `handle()` catches thrown responses and `ZodError`s and turns everything into `{ error: "<русское сообщение>" }` JSON.
-- Endpoints: CRUD `GET/POST /api/<entity>`, `PUT/DELETE /api/<entity>/[id]`; `POST /api/{placements,debts}/reorder` (body `{ ids: number[] }` — array position becomes `sort_order`); `GET /api/summary`; `POST /api/placements/check-balances`; `GET /api/trx-snapshots?days=N` (TRX history for the dashboard chart); `GET /api/cron/snapshot` (Vercel Cron, authenticated by `Authorization: Bearer <CRON_SECRET>` inside the route — the path is in `PUBLIC_PATHS` of `src/proxy.ts`); `POST /api/login`, `POST /api/logout`.
+- Endpoints: CRUD `GET/POST /api/<entity>`, `PUT/DELETE /api/<entity>/[id]`; `POST /api/{placements,debts}/reorder` (body `{ ids: number[] }` — array position becomes `sort_order`); `GET /api/summary`; `POST /api/placements/check-balances`; `GET /api/trx-snapshots?days=N` (TRX history for the dashboard chart); `GET /api/trx-price` (TRX/USDT rate from Bitget's public ticker, `{ price: null }` on exchange failure); `GET /api/cron/snapshot` (Vercel Cron, authenticated by `Authorization: Bearer <CRON_SECRET>` inside the route — the path is in `PUBLIC_PATHS` of `src/proxy.ts`); `POST /api/login`, `POST /api/logout`.
 
 ### Client conventions
 

@@ -211,6 +211,32 @@ export function fetchAllAccountBalances(): Promise<BitgetAccountBalance[]> {
   return signedRequest<BitgetAccountBalance[]>("GET", "/api/v2/account/all-account-balance");
 }
 
+// ================= КУРС TRX =================
+
+/**
+ * Текущий курс TRX/USDT (≈ USD) по публичному спотовому тикеру.
+ * Запрос не подписывается: публичные endpoint'ы не проверяют ни ключ,
+ * ни IP-whitelist (подписанный запрос с не-whitelisted IP Bitget отвергает).
+ * Прокси и таймаут — те же, что у приватных запросов.
+ */
+export async function fetchTrxUsdtPrice(): Promise<number> {
+  const res = await fetch(`${BASE_URL}/api/v2/spot/market/tickers?symbol=TRXUSDT`, {
+    signal: AbortSignal.timeout(10_000),
+    cache: "no-store",
+    // dispatcher — опция undici, см. signedRequest.
+    dispatcher: getExchangeDispatcher(),
+  } as RequestInit & { dispatcher?: Dispatcher });
+  const json = (await res.json().catch(() => null)) as BitgetEnvelope<{ lastPr: string }[]> | null;
+  if (!res.ok || !json || json.code !== OK_CODE) {
+    throw new Error(`Bitget: ${json?.msg ?? `HTTP ${res.status}`}`);
+  }
+  const price = Number(json.data?.[0]?.lastPr);
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Bitget: не удалось получить курс TRX");
+  }
+  return price;
+}
+
 // ================= ВЫВОД TRX =================
 
 interface BitgetCoinChain {

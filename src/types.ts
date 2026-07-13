@@ -89,6 +89,11 @@ export interface TrxSnapshot {
   trx_amount: number;
 }
 
+// Текущий курс TRX. Десятичные USDT (≈ USD) за 1 TRX; null — курс недоступен.
+export interface TrxPrice {
+  price: number | null;
+}
+
 // --- Telegram-бот: черновики долгов ---
 
 export const TG_DRAFT_STATUSES = [

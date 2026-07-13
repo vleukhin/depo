@@ -5,7 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { TrxAmount } from "@/components/TrxAmount";
+import { formatAmount } from "@/lib/format";
 import { useSummary } from "@/hooks/useSummary";
+import { useTrxPrice } from "@/hooks/useTrxPrice";
 
 function StatCard({
   icon,
@@ -65,12 +67,16 @@ function StatCard({
 
 export function DashboardCards() {
   const { data } = useSummary();
+  const { data: trxPrice } = useTrxPrice();
 
   const funds = data?.total_funds ?? 0;
   const placed = data?.total_placements ?? 0;
   const debts = data?.total_debts ?? 0;
   const diff = data?.diff ?? 0;
   const balanced = data?.balanced ?? true;
+  const totalTrx = data?.total_trx ?? 0;
+  // Примерная оценка TRX в долларах (курс TRX/USDT ≈ USD); null — курс недоступен.
+  const trxUsd = trxPrice?.price != null ? totalTrx * trxPrice.price : null;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -90,6 +96,12 @@ export function DashboardCards() {
         value={<UsdtAmount value={debts} />}
       />
       <StatCard
+        icon={<Coins className="size-5" />}
+        label="Всего TRX"
+        value={<TrxAmount value={totalTrx} />}
+        hint={trxUsd != null ? `≈ ${formatAmount(trxUsd)} $` : "Не входит в сверку"}
+      />
+      <StatCard
         icon={<Scale className="size-5" />}
         label="Сверка (размещено + долги)"
         value={balanced ? "Сходится" : <UsdtAmount value={diff} signed />}
@@ -101,12 +113,6 @@ export function DashboardCards() {
               : "Недостача"
         }
         tone={diff >= 0 ? "ok" : "bad"}
-      />
-      <StatCard
-        icon={<Coins className="size-5" />}
-        label="Всего TRX"
-        value={<TrxAmount value={data?.total_trx ?? 0} />}
-        hint="Не входит в сверку"
       />
     </div>
   );
