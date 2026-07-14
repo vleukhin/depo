@@ -140,7 +140,7 @@ export function PlacementsSection() {
                   >
                     <span className="inline-flex items-center justify-end gap-1">
                       {p.trx_amount != null ? <TrxAmount value={p.trx_amount} /> : "—"}
-                      {p.kind === "wallet" && isTronAddress(p.address) && (
+                      {p.kind === "wallet" && isTronAddress(p.address) ? (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -154,6 +154,10 @@ export function PlacementsSection() {
                         >
                           <Plus className="size-3.5" />
                         </Button>
+                      ) : (
+                        // Заглушка на месте кнопки «+», чтобы числа не съезжали
+                        // в строках без неё (биржи, кошельки без адреса).
+                        <span aria-hidden className="size-6 shrink-0" />
                       )}
                     </span>
                   </TableCell>
