@@ -13,9 +13,11 @@ import type { PlacementInput, TrxWithdrawInput } from "@/lib/validate";
 
 export const {
   useList: usePlacements,
+  useListDeleted: useDeletedPlacements,
   useCreate: useCreatePlacement,
   useUpdate: useUpdatePlacement,
   useDelete: useDeletePlacement,
+  useRestore: useRestorePlacement,
   useReorder: useReorderPlacements,
 } = createResourceHooks<Placement, PlacementInput>("placements", "placements");
 

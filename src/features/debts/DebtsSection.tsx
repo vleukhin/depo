@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Users } from "lucide-react";
+import Link from "next/link";
+import { Archive, Pencil, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -58,10 +59,18 @@ export function DebtsSection() {
       description="Кто и сколько взял из депо"
       onAdd={openCreate}
       actions={
-        <Button size="sm" variant="outline" onClick={() => setManagersOpen(true)}>
-          <Users className="size-4" />
-          Менеджеры
-        </Button>
+        <>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/archive/debts">
+              <Archive className="size-4" />
+              Архив
+            </Link>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setManagersOpen(true)}>
+            <Users className="size-4" />
+            Менеджеры
+          </Button>
+        </>
       }
     >
       <div className="overflow-x-auto">
@@ -109,7 +118,10 @@ export function DebtsSection() {
                     >
                       <Pencil className="size-4 text-muted-foreground" />
                     </Button>
-                    <DeleteButton onConfirm={() => del.mutateAsync(debt.id)} />
+                    <DeleteButton
+                      description="Долг переместится в архив. Восстановить можно на странице архива."
+                      onConfirm={() => del.mutateAsync(debt.id)}
+                    />
                   </TableCell>
                 </SortableRow>
               ))}

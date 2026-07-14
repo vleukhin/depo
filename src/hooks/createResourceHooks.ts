@@ -14,6 +14,14 @@ export function createResourceHooks<T extends { id: number }, Input>(
     return useQuery({ queryKey: listKey, queryFn: () => api.get<T[]>(url) });
   }
 
+  /** Только мягко удалённые записи (страница архива). */
+  function useListDeleted() {
+    return useQuery({
+      queryKey: [key, "deleted"],
+      queryFn: () => api.get<T[]>(`${url}?deleted=1`),
+    });
+  }
+
   function useInvalidate() {
     const qc = useQueryClient();
     return () => {
@@ -49,6 +57,15 @@ export function createResourceHooks<T extends { id: number }, Input>(
     });
   }
 
+  /** Восстановление мягко удалённой записи. Инвалидация [key] префиксно накрывает и [key, "deleted"]. */
+  function useRestore() {
+    const invalidate = useInvalidate();
+    return useMutation({
+      mutationFn: (id: number) => api.post<T>(`${url}/${id}/restore`, {}),
+      onSuccess: invalidate,
+    });
+  }
+
   /** Ручная сортировка: оптимистично переставляет кэш, при ошибке откатывает. */
   function useReorder() {
     const qc = useQueryClient();
@@ -73,5 +90,5 @@ export function createResourceHooks<T extends { id: number }, Input>(
     });
   }
 
-  return { useList, useCreate, useUpdate, useDelete, useReorder };
+  return { useList, useListDeleted, useCreate, useUpdate, useDelete, useRestore, useReorder };
 }

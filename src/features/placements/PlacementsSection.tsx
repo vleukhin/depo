@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Pencil, Plus, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { Archive, Pencil, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,15 +117,23 @@ export function PlacementsSection() {
       description="Где средства находятся сейчас"
       onAdd={openCreate}
       actions={
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={checkBalances}
-          disabled={check.isPending}
-        >
-          <RefreshCw className={check.isPending ? "size-4 animate-spin" : "size-4"} />
-          {check.isPending ? "Проверка…" : "Проверить балансы"}
-        </Button>
+        <>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/archive/placements">
+              <Archive className="size-4" />
+              Архив
+            </Link>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={checkBalances}
+            disabled={check.isPending}
+          >
+            <RefreshCw className={check.isPending ? "size-4 animate-spin" : "size-4"} />
+            {check.isPending ? "Проверка…" : "Проверить балансы"}
+          </Button>
+        </>
       }
     >
       <div className="overflow-x-auto">
@@ -207,7 +216,7 @@ export function PlacementsSection() {
                       <Pencil className="size-4 text-muted-foreground" />
                     </Button>
                     <DeleteButton
-                      description="Размещение будет удалено. У связанных долгов источник станет пустым."
+                      description="Размещение переместится в архив. Пока оно там, у связанных долгов источник не отображается. Восстановить можно на странице архива."
                       onConfirm={() => del.mutateAsync(p.id)}
                     />
                   </TableCell>

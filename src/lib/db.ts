@@ -99,6 +99,9 @@ async function migrate(db: Client) {
     );
     await dropColumn(db, "debts", "manager"); // старая текстовая колонка больше не нужна
   }
+  // Мягкое удаление: NULL — запись активна, иначе UTC-момент удаления.
+  await ensureColumn(db, "placements", "deleted_at", "TEXT", { backfillFromId: false });
+  await ensureColumn(db, "debts", "deleted_at", "TEXT", { backfillFromId: false });
 }
 
 async function columnNames(db: Client, table: string): Promise<Set<string>> {
@@ -151,6 +154,7 @@ CREATE TABLE IF NOT EXISTS placements (
   sort_order INTEGER NOT NULL DEFAULT 0,
   chain_checked_at TEXT,
   trx_amount INTEGER,
+  deleted_at TEXT,
   created_at TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
@@ -173,6 +177,7 @@ CREATE TABLE IF NOT EXISTS debts (
   source_text  TEXT,
   comment      TEXT,
   sort_order   INTEGER NOT NULL DEFAULT 0,
+  deleted_at   TEXT,
   created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at   TEXT    NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (placement_id) REFERENCES placements(id) ON DELETE SET NULL,

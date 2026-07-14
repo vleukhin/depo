@@ -223,6 +223,13 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>— не указан —</SelectItem>
+            {/* Источник долга в архиве: в usePlacements() его нет, но id сохраняется при сохранении. */}
+            {debt?.placement_id != null &&
+              !placements.some((p) => p.id === debt.placement_id) && (
+                <SelectItem value={String(debt.placement_id)} disabled>
+                  Источник в архиве
+                </SelectItem>
+              )}
             {placements.map((p) => (
               <SelectItem key={p.id} value={String(p.id)}>
                 {p.name}

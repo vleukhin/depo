@@ -38,6 +38,7 @@ const toPlacement = (r: Row): Placement => ({
   comment: (r.comment as string | null) ?? null,
   chain_checked_at: (r.chain_checked_at as string | null) ?? null,
   trx_amount: r.trx_amount === null ? null : fromMicro(Number(r.trx_amount)),
+  deleted_at: (r.deleted_at as string | null) ?? null,
   created_at: String(r.created_at),
   updated_at: String(r.updated_at),
 });
@@ -60,6 +61,9 @@ const toDebt = (r: Row): Debt => ({
   placement_name: (r.placement_name as string | null) ?? null,
   source_text: (r.source_text as string | null) ?? null,
   comment: (r.comment as string | null) ?? null,
+  deleted_at: (r.deleted_at as string | null) ?? null,
+  // Колонка есть только в архивной выборке (DEBT_SELECT_ARCHIVE); в остальных undefined -> null.
+  placement_deleted_at: (r.placement_deleted_at as string | null) ?? null,
   created_at: String(r.created_at),
   updated_at: String(r.updated_at),
 });
@@ -131,7 +135,8 @@ export async function deleteManager(id: number): Promise<boolean> {
   const rs = await db.execute({ sql: "DELETE FROM managers WHERE id = ?", args: [id] });
   return rs.rowsAffected > 0;
 }
-/** Есть ли долги, ссылающиеся на менеджера (удаление таких запрещено). */
+/** Есть ли долги, ссылающиеся на менеджера (удаление таких запрещено).
+ * Архивные долги тоже считаются: они ссылаются на менеджера (FK RESTRICT). */
 export async function managerInUse(id: number): Promise<boolean> {
   const db = await getClient();
   const rs = await db.execute({
@@ -160,12 +165,25 @@ export async function findManagerByTelegram(username: string): Promise<Manager |
 // ================= PLACEMENTS =================
 export async function listPlacements(): Promise<Placement[]> {
   const db = await getClient();
-  const rs = await db.execute("SELECT * FROM placements ORDER BY sort_order ASC, id ASC");
+  const rs = await db.execute(
+    "SELECT * FROM placements WHERE deleted_at IS NULL ORDER BY sort_order ASC, id ASC",
+  );
+  return rs.rows.map(toPlacement);
+}
+/** Удалённые размещения — для страницы архива, свежеудалённые сверху. */
+export async function listDeletedPlacements(): Promise<Placement[]> {
+  const db = await getClient();
+  const rs = await db.execute(
+    "SELECT * FROM placements WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC, id DESC",
+  );
   return rs.rows.map(toPlacement);
 }
 export async function getPlacement(id: number): Promise<Placement | null> {
   const db = await getClient();
-  const rs = await db.execute({ sql: "SELECT * FROM placements WHERE id = ?", args: [id] });
+  const rs = await db.execute({
+    sql: "SELECT * FROM placements WHERE id = ? AND deleted_at IS NULL",
+    args: [id],
+  });
   return rs.rows[0] ? toPlacement(rs.rows[0]) : null;
 }
 export async function createPlacement(input: PlacementInput): Promise<Placement> {
@@ -194,7 +212,7 @@ export async function updatePlacement(
 ): Promise<Placement | null> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "UPDATE placements SET name = ?, amount = ?, kind = ?, address = ?, exchange = ?, exchange_account = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
+    sql: "UPDATE placements SET name = ?, amount = ?, kind = ?, address = ?, exchange = ?, exchange_account = ?, comment = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
     args: [
       input.name,
       toMicro(input.amount),
@@ -210,22 +228,55 @@ export async function updatePlacement(
   const row = await db.execute({ sql: "SELECT * FROM placements WHERE id = ?", args: [id] });
   return toPlacement(row.rows[0]);
 }
+/** Мягкое удаление: запись остаётся в БД и видна на странице архива. */
 export async function deletePlacement(id: number): Promise<boolean> {
   const db = await getClient();
-  const rs = await db.execute({ sql: "DELETE FROM placements WHERE id = ?", args: [id] });
+  const rs = await db.execute({
+    sql: "UPDATE placements SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
+    args: [id],
+  });
   return rs.rowsAffected > 0;
+}
+/** Восстановление из архива: запись встаёт в конец видимого списка. */
+export async function restorePlacement(id: number): Promise<Placement | null> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql:
+      "UPDATE placements SET deleted_at = NULL, updated_at = datetime('now'), " +
+      "sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements WHERE deleted_at IS NULL) " +
+      "WHERE id = ? AND deleted_at IS NOT NULL",
+    args: [id],
+  });
+  if (rs.rowsAffected === 0) return null;
+  return getPlacement(id);
 }
 
 // ================= DEBTS =================
+const DEBT_FIELDS = "d.*, p.name AS placement_name, m.name AS manager_name";
+// Активные представления: имя источника скрыто, пока размещение в архиве (JOIN не матчится).
 const DEBT_SELECT =
-  "SELECT d.*, p.name AS placement_name, m.name AS manager_name " +
-  "FROM debts d " +
+  `SELECT ${DEBT_FIELDS} FROM debts d ` +
+  "LEFT JOIN placements p ON p.id = d.placement_id AND p.deleted_at IS NULL " +
+  "LEFT JOIN managers m ON m.id = d.manager_id";
+// Архив: имя источника показываем всегда + флаг, что источник сам в архиве.
+const DEBT_SELECT_ARCHIVE =
+  `SELECT ${DEBT_FIELDS}, p.deleted_at AS placement_deleted_at FROM debts d ` +
   "LEFT JOIN placements p ON p.id = d.placement_id " +
   "LEFT JOIN managers m ON m.id = d.manager_id";
 
 export async function listDebts(): Promise<Debt[]> {
   const db = await getClient();
-  const rs = await db.execute(`${DEBT_SELECT} ORDER BY d.sort_order ASC, d.id ASC`);
+  const rs = await db.execute(
+    `${DEBT_SELECT} WHERE d.deleted_at IS NULL ORDER BY d.sort_order ASC, d.id ASC`,
+  );
+  return rs.rows.map(toDebt);
+}
+/** Удалённые долги — для страницы архива, свежеудалённые сверху. */
+export async function listDeletedDebts(): Promise<Debt[]> {
+  const db = await getClient();
+  const rs = await db.execute(
+    `${DEBT_SELECT_ARCHIVE} WHERE d.deleted_at IS NOT NULL ORDER BY d.deleted_at DESC, d.id DESC`,
+  );
   return rs.rows.map(toDebt);
 }
 async function getDebt(id: number): Promise<Debt> {
@@ -252,7 +303,7 @@ export async function createDebt(input: DebtInput): Promise<Debt> {
 export async function updateDebt(id: number, input: DebtInput): Promise<Debt | null> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "UPDATE debts SET manager_id = ?, amount = ?, date = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ?",
+    sql: "UPDATE debts SET manager_id = ?, amount = ?, date = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
     args: [
       input.manager_id,
       toMicro(input.amount),
@@ -267,10 +318,27 @@ export async function updateDebt(id: number, input: DebtInput): Promise<Debt | n
   if (rs.rowsAffected === 0) return null;
   return getDebt(id);
 }
+/** Мягкое удаление: запись остаётся в БД и видна на странице архива. */
 export async function deleteDebt(id: number): Promise<boolean> {
   const db = await getClient();
-  const rs = await db.execute({ sql: "DELETE FROM debts WHERE id = ?", args: [id] });
+  const rs = await db.execute({
+    sql: "UPDATE debts SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
+    args: [id],
+  });
   return rs.rowsAffected > 0;
+}
+/** Восстановление из архива: запись встаёт в конец видимого списка. */
+export async function restoreDebt(id: number): Promise<Debt | null> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql:
+      "UPDATE debts SET deleted_at = NULL, updated_at = datetime('now'), " +
+      "sort_order = (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts WHERE deleted_at IS NULL) " +
+      "WHERE id = ? AND deleted_at IS NOT NULL",
+    args: [id],
+  });
+  if (rs.rowsAffected === 0) return null;
+  return getDebt(id);
 }
 
 // ================= CHAIN / EXCHANGE BALANCE =================
@@ -280,7 +348,7 @@ export async function listPlacementsWithAddress(): Promise<
 > {
   const db = await getClient();
   const rs = await db.execute(
-    "SELECT id, name, address FROM placements WHERE address IS NOT NULL AND address != ''",
+    "SELECT id, name, address FROM placements WHERE address IS NOT NULL AND address != '' AND deleted_at IS NULL",
   );
   return rs.rows.map((r) => ({
     id: Number(r.id),
@@ -295,7 +363,7 @@ export async function listExchangePlacements(): Promise<
 > {
   const db = await getClient();
   const rs = await db.execute(
-    "SELECT id, name, exchange, exchange_account FROM placements WHERE kind = 'exchange' AND exchange IS NOT NULL AND exchange_account IS NOT NULL",
+    "SELECT id, name, exchange, exchange_account FROM placements WHERE kind = 'exchange' AND exchange IS NOT NULL AND exchange_account IS NOT NULL AND deleted_at IS NULL",
   );
   return rs.rows.map((r) => ({
     id: Number(r.id),
@@ -324,7 +392,8 @@ async function reorder(table: "placements" | "debts", ids: number[]): Promise<vo
   const db = await getClient();
   await db.batch(
     ids.map((id, index) => ({
-      sql: `UPDATE ${table} SET sort_order = ? WHERE id = ?`,
+      // Guard по deleted_at: устаревший клиент с архивным id не трогает архив.
+      sql: `UPDATE ${table} SET sort_order = ? WHERE id = ? AND deleted_at IS NULL`,
       args: [index, id],
     })),
     "write",
@@ -340,17 +409,21 @@ export function reorderDebts(ids: number[]): Promise<void> {
 // ================= SUMMARY =================
 export async function getSummary(): Promise<Summary> {
   const db = await getClient();
-  const one = async (table: string): Promise<number> => {
-    const rs = await db.execute(`SELECT COALESCE(SUM(amount), 0) AS s FROM ${table}`);
+  const one = async (table: string, activeOnly = false): Promise<number> => {
+    const rs = await db.execute(
+      `SELECT COALESCE(SUM(amount), 0) AS s FROM ${table}${activeOnly ? " WHERE deleted_at IS NULL" : ""}`,
+    );
     return Number(rs.rows[0].s);
   };
   // Сверка в micro-единицах: размещено + долги против депо.
-  // diff > 0 — избыток, diff < 0 — недостача.
+  // diff > 0 — избыток, diff < 0 — недостача. Архивные записи в сверку не входят.
   const funds = await one("funds");
-  const placements = await one("placements");
-  const debts = await one("debts");
+  const placements = await one("placements", true);
+  const debts = await one("debts", true);
   // TRX информационный, в сверку не входит (SUM пропускает NULL непроверенных строк).
-  const trx = await db.execute("SELECT COALESCE(SUM(trx_amount), 0) AS s FROM placements");
+  const trx = await db.execute(
+    "SELECT COALESCE(SUM(trx_amount), 0) AS s FROM placements WHERE deleted_at IS NULL",
+  );
   const diff = placements + debts - funds;
   return {
     total_funds: fromMicro(funds),
@@ -368,12 +441,12 @@ const toTrxSnapshot = (r: Row): TrxSnapshot => ({
   trx_amount: fromMicro(Number(r.trx_amount)),
 });
 
-/** Апсертит снимок за сегодня (по МСК): сумма trx_amount всех размещений. */
+/** Апсертит снимок за сегодня (по МСК): сумма trx_amount активных размещений. */
 export async function upsertTodayTrxSnapshot(): Promise<void> {
   const db = await getClient();
   await db.execute(
     "INSERT INTO trx_snapshots (date, trx_amount) " +
-      "VALUES (date(datetime('now','+3 hours')), (SELECT COALESCE(SUM(trx_amount), 0) FROM placements)) " +
+      "VALUES (date(datetime('now','+3 hours')), (SELECT COALESCE(SUM(trx_amount), 0) FROM placements WHERE deleted_at IS NULL)) " +
       "ON CONFLICT(date) DO UPDATE SET trx_amount = excluded.trx_amount, updated_at = datetime('now')",
   );
 }

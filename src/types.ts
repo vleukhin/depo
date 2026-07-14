@@ -30,6 +30,7 @@ export interface Placement {
   comment: string | null;
   chain_checked_at: string | null; // когда сумма обновлялась из сети/с биржи, NULL — никогда
   trx_amount: number | null; // баланс нативного TRX (в TRX), NULL — не проверяли
+  deleted_at: string | null; // мягкое удаление: NULL — активно
   created_at: string;
   updated_at: string;
 }
@@ -70,6 +71,8 @@ export interface Debt {
   placement_name: string | null; // подтягивается через LEFT JOIN
   source_text: string | null;
   comment: string | null;
+  deleted_at: string | null; // мягкое удаление: NULL — активен
+  placement_deleted_at: string | null; // источник-размещение в архиве (заполняется только в архивной выборке)
   created_at: string;
   updated_at: string;
 }

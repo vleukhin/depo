@@ -57,6 +57,7 @@ Amounts are stored as **integer micro-USDT** (USDT × 1 000 000) for exact recon
 - The schema is an **embedded `SCHEMA` string in `lib/db.ts`** (not a separate `.sql` file, so it survives serverless bundling), applied idempotently via `executeMultiple` (`CREATE TABLE IF NOT EXISTS`).
 - **Migrations**: `SCHEMA` only covers fresh databases. Changes to existing databases go into `migrate()` in `lib/db.ts` using the async `ensureColumn`/`dropColumn` helpers. When adding a column, update *both* the `SCHEMA` string and `migrate()`.
 - `debts.placement_id` is a FK to placements with `ON DELETE SET NULL`; debt queries LEFT JOIN to expose `placement_name`. (Turso enforces FKs per the `PRAGMA foreign_keys = ON` set at init; the LEFT JOIN keeps the UI correct even if a stale id lingered.)
+- **Soft delete (placements & debts only)**: `DELETE /api/{placements,debts}/[id]` sets `deleted_at` instead of removing the row (funds/managers still hard-delete). Active queries filter `deleted_at IS NULL` — including `getSummary`, balance checks, and TRX snapshots. The active debt JOIN adds `AND p.deleted_at IS NULL`, so an archived placement's name disappears from its debts until restored (`placement_id` is kept). Archive pages `/archive/{placements,debts}` list only deleted rows via `GET ?deleted=1` (newest deletions first); `POST /api/<entity>/[id]/restore` un-deletes and appends to the end of the visible sort order.
 
 ### API conventions
 
