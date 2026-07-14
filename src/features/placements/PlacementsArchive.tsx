@@ -10,8 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RestoreButton } from "@/components/RestoreButton";
-import { UsdtAmount } from "@/components/UsdtAmount";
-import { TrxAmount } from "@/components/TrxAmount";
+import { AddressCell } from "@/components/AddressCell";
 import { formatDate } from "@/lib/format";
 import { useDeletedPlacements, useRestorePlacement } from "@/hooks/usePlacements";
 import { ACCOUNT_LABELS } from "./PlacementForm";
@@ -36,8 +35,6 @@ export function PlacementsArchive() {
             <TableHeader>
               <TableRow>
                 <TableHead>Название</TableHead>
-                <TableHead className="text-right">Сумма</TableHead>
-                <TableHead className="text-right">TRX</TableHead>
                 <TableHead>Адрес / счёт</TableHead>
                 <TableHead>Комментарий</TableHead>
                 <TableHead>Удалено</TableHead>
@@ -48,19 +45,13 @@ export function PlacementsArchive() {
               {placements.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell className="text-right">
-                    <UsdtAmount value={p.amount} />
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {p.trx_amount != null ? <TrxAmount value={p.trx_amount} /> : "—"}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground max-w-56 truncate">
+                  <TableCell className="font-mono text-xs text-muted-foreground">
                     {p.kind === "exchange" && p.exchange && p.exchange_account ? (
                       <span className="font-sans">
                         {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
                       </span>
                     ) : (
-                      (p.address ?? "—")
+                      <AddressCell address={p.address} />
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
@@ -79,7 +70,7 @@ export function PlacementsArchive() {
               ))}
               {!isLoading && placements.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     Архив пуст
                   </TableCell>
                 </TableRow>
