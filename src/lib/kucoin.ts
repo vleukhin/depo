@@ -135,9 +135,9 @@ const ACCOUNT_TYPES: Record<"spot" | "main", KucoinAccountType[]> = {
 };
 
 /**
- * Суммарный баланс произвольной монеты на счетах указанного типа в целых
- * micro-единицах (монета × 1 000 000). Берётся полный баланс (`balance`,
- * включая заблокированное в ордерах), а не `available`.
+ * Доступный баланс произвольной монеты на счетах указанного типа в целых
+ * micro-единицах (монета × 1 000 000). Берётся `available` (без заблокированного
+ * в ордерах, поле `holds`), а не полный `balance`.
  * Один запрос с фильтром по валюте; фильтрация по типам счёта — локально,
  * потому что API принимает лишь один type, а для "spot" нужны два.
  * Если подходящих счетов нет — 0.
@@ -147,7 +147,7 @@ async function fetchCoinBalanceMicro(coin: string, account: "spot" | "main"): Pr
   const accounts = await fetchAccounts({ currency: coin });
   return accounts
     .filter((a) => a.currency === coin && types.includes(a.type))
-    .reduce((sum, a) => sum + decimalToMicro(a.balance), 0);
+    .reduce((sum, a) => sum + decimalToMicro(a.available), 0);
 }
 
 /** Суммарный баланс USDT на счёте указанного типа в целых micro-USDT (USDT × 1 000 000). */
