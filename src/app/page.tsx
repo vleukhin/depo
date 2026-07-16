@@ -3,7 +3,6 @@ import { HeroCard } from "@/features/dashboard/HeroCard";
 import { DashboardCards } from "@/features/dashboard/DashboardCards";
 import { DepoStructureCard } from "@/features/dashboard/DepoStructureCard";
 import { TrxChartCard } from "@/features/dashboard/TrxChartCard";
-import { FundsSection } from "@/features/funds/FundsSection";
 import { PlacementsSection } from "@/features/placements/PlacementsSection";
 import { DebtsSection } from "@/features/debts/DebtsSection";
 
@@ -24,8 +23,6 @@ export default function Home() {
           <DepoStructureCard />
           <TrxChartCard />
         </div>
-
-        <FundsSection />
 
         <div className="space-y-6">
           <PlacementsSection />

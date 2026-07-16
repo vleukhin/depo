@@ -7,17 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UsdtIcon } from "@/components/UsdtAmount";
-import { DialogFooter } from "@/components/ui/dialog";
 import { fundInput, type FundFormValues, type FundInput } from "@/lib/validate";
 import { useCreateFund, useUpdateFund } from "@/hooks/useFunds";
 import type { Fund } from "@/types";
 
-export function FundForm({ fund, onDone }: { fund?: Fund; onDone: () => void }) {
+/** Инлайн-форма add/edit средства (по образцу ManagerForm) — живёт в FundsDialog. */
+export function FundForm({
+  fund,
+  onDone,
+  onCancel,
+}: {
+  fund?: Fund;
+  onDone: () => void;
+  onCancel?: () => void;
+}) {
   const create = useCreateFund();
   const update = useUpdateFund();
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<FundFormValues, unknown, FundInput>({
     resolver: zodResolver(fundInput),
@@ -31,6 +40,7 @@ export function FundForm({ fund, onDone }: { fund?: Fund; onDone: () => void }) 
       if (fund) await update.mutateAsync({ id: fund.id, input: values });
       else await create.mutateAsync(values);
       toast.success(fund ? "Изменения сохранены" : "Средство добавлено");
+      reset({ name: "", amount: 0 }); // очистить форму под следующий ввод
       onDone();
     } catch (e) {
       toast.error((e as Error).message);
@@ -38,18 +48,20 @@ export function FundForm({ fund, onDone }: { fund?: Fund; onDone: () => void }) 
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="name">Название</Label>
-        <Input id="name" placeholder="Напр. Личные средства" {...register("name")} />
+    <form onSubmit={handleSubmit(onSubmit)} className="flex items-start gap-2">
+      <div className="flex-1 space-y-1">
+        <Label htmlFor="f-name" className="text-xs text-muted-foreground">
+          Название
+        </Label>
+        <Input id="f-name" placeholder="Напр. Личные средства" {...register("name")} />
         {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="amount" className="gap-1">
-          Сумма, <UsdtIcon className="size-3.5" />
+      <div className="w-32 space-y-1">
+        <Label htmlFor="f-amount" className="gap-1 text-xs text-muted-foreground">
+          Сумма, <UsdtIcon className="size-3" />
         </Label>
         <Input
-          id="amount"
+          id="f-amount"
           type="number"
           step="1"
           min="0"
@@ -58,11 +70,16 @@ export function FundForm({ fund, onDone }: { fund?: Fund; onDone: () => void }) 
         />
         {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
       </div>
-      <DialogFooter>
-        <Button type="submit" disabled={submitting}>
-          {submitting ? "Сохранение…" : "Сохранить"}
+      <div className="flex items-center gap-1 pt-[1.375rem]">
+        <Button type="submit" size="sm" disabled={submitting}>
+          {fund ? "Сохранить" : "Добавить"}
         </Button>
-      </DialogFooter>
+        {fund && onCancel && (
+          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+            Отмена
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
