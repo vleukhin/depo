@@ -122,10 +122,10 @@ export function PlacementsSection() {
       onAdd={openCreate}
       actions={
         <>
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" variant="outline" asChild aria-label="Архив">
             <Link href="/archive/placements">
               <Archive className="size-4" />
-              Архив
+              <span className="hidden md:inline">Архив</span>
             </Link>
           </Button>
           <Button
@@ -133,9 +133,12 @@ export function PlacementsSection() {
             variant="outline"
             onClick={checkBalances}
             disabled={check.isPending}
+            aria-label="Проверить балансы"
           >
             <RefreshCw className={check.isPending ? "size-4 animate-spin" : "size-4"} />
-            {check.isPending ? "Проверка…" : "Проверить балансы"}
+            <span className="hidden md:inline">
+              {check.isPending ? "Проверка…" : "Проверить балансы"}
+            </span>
           </Button>
         </>
       }

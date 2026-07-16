@@ -92,15 +92,20 @@ export function DebtsSection() {
       onAdd={openCreate}
       actions={
         <>
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" variant="outline" asChild aria-label="Архив">
             <Link href="/archive/debts">
               <Archive className="size-4" />
-              Архив
+              <span className="hidden md:inline">Архив</span>
             </Link>
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setManagersOpen(true)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setManagersOpen(true)}
+            aria-label="Менеджеры"
+          >
             <Users className="size-4" />
-            Менеджеры
+            <span className="hidden md:inline">Менеджеры</span>
           </Button>
         </>
       }

@@ -77,9 +77,9 @@ export function SectionCard({
           onClick={(e) => e.stopPropagation()}
         >
           {actions}
-          <Button size="sm" onClick={onAdd}>
+          <Button size="sm" onClick={onAdd} aria-label="Добавить">
             <Plus className="size-4" />
-            Добавить
+            <span className="hidden md:inline">Добавить</span>
           </Button>
         </CardAction>
       </CardHeader>
