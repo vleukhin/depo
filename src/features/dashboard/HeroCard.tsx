@@ -10,7 +10,11 @@ import { FundsDialog } from "@/features/funds/FundsDialog";
 
 /** Статус сверки как капсула-пилюля. Использует семантические токены success/destructive. */
 function ReconciliationPill({ balanced, diff }: { balanced: boolean; diff: number }) {
-  const negative = !balanced && diff < 0;
+  // Суммы отображаются округлёнными до целых, поэтому расхождение меньше 0.5
+  // визуально неотличимо от нуля — показываем «Сходится», а не «Недостача −0».
+  const rounded = Math.round(diff);
+  const shown = balanced || rounded === 0;
+  const negative = !shown && rounded < 0;
   return (
     <span
       className={cn(
@@ -21,11 +25,11 @@ function ReconciliationPill({ balanced, diff }: { balanced: boolean; diff: numbe
       )}
     >
       <span className="size-1.5 rounded-full bg-current" aria-hidden />
-      {balanced ? (
+      {shown ? (
         "Сходится"
       ) : (
         <>
-          {diff > 0 ? "Избыток" : "Недостача"}
+          {rounded > 0 ? "Избыток" : "Недостача"}
           <UsdtAmount value={diff} signed />
         </>
       )}
