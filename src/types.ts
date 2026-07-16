@@ -10,6 +10,10 @@ export type Exchange = (typeof EXCHANGES)[number];
 export const EXCHANGE_ACCOUNTS = ["spot", "main"] as const;
 export type ExchangeAccount = (typeof EXCHANGE_ACCOUNTS)[number];
 
+// Иконка размещения — выбирается вручную в настройках. null — без иконки.
+export const PLACEMENT_ICONS = ["kucoin", "bitget", "onekey", "tangem"] as const;
+export type PlacementIconId = (typeof PLACEMENT_ICONS)[number];
+
 // Суммы во всех типах ниже — в десятичных USDT (micro-USDT остаётся внутри БД).
 export interface Fund {
   id: number;
@@ -27,6 +31,7 @@ export interface Placement {
   address: string | null; // только для kind = 'wallet'
   exchange: Exchange | null; // только для kind = 'exchange'
   exchange_account: ExchangeAccount | null; // тип счёта на бирже
+  icon: PlacementIconId | null; // иконка размещения (выбирается вручную), NULL — без иконки
   comment: string | null;
   chain_checked_at: string | null; // когда сумма обновлялась из сети/с биржи, NULL — никогда
   trx_amount: number | null; // баланс нативного TRX (в TRX), NULL — не проверяли

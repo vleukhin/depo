@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EXCHANGE_ACCOUNTS, EXCHANGES, SERVICES } from "@/types";
+import { EXCHANGE_ACCOUNTS, EXCHANGES, PLACEMENT_ICONS, SERVICES } from "@/types";
 
 // Суммы приходят с клиента в десятичных USDT (валидное число; форма шлёт number).
 const amount = z
@@ -38,6 +38,10 @@ export const placementInput = z
       .transform((v) => v ?? null),
     exchange_account: z
       .enum(EXCHANGE_ACCOUNTS, { message: "Некорректный тип счёта" })
+      .nullish()
+      .transform((v) => v ?? null),
+    icon: z
+      .enum(PLACEMENT_ICONS, { message: "Некорректная иконка" })
       .nullish()
       .transform((v) => v ?? null),
     comment: optionalText,

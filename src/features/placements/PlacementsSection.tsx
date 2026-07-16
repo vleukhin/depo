@@ -25,6 +25,7 @@ import { DeleteButton } from "@/components/DeleteButton";
 import { SortableCard, SortableRow, SortableRows } from "@/components/SortableRows";
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { TrxAmount } from "@/components/TrxAmount";
+import { PlacementIcon } from "@/components/PlacementIcon";
 import { isTronAddress } from "@/lib/tron";
 import {
   useCheckBalances,
@@ -119,7 +120,12 @@ export function PlacementsSection() {
             <TableBody>
               {placements.map((p) => (
                 <SortableRow key={p.id} id={p.id}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex items-center gap-1.5">
+                      {p.icon && <PlacementIcon icon={p.icon} className="size-3.5" />}
+                      {p.name}
+                    </span>
+                  </TableCell>
                   <TableCell
                     className="text-right"
                     title={
@@ -210,7 +216,10 @@ export function PlacementsSection() {
           {placements.map((p) => (
             <SortableCard key={p.id} id={p.id}>
               <div className="flex items-start justify-between gap-2">
-                <span className="font-medium">{p.name}</span>
+                <span className="inline-flex items-center gap-1.5 font-medium">
+                  {p.icon && <PlacementIcon icon={p.icon} className="size-3.5" />}
+                  {p.name}
+                </span>
                 <span
                   className="text-base font-semibold"
                   title={

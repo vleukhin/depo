@@ -9,6 +9,7 @@ import type {
   Summary,
   Service,
   PlacementKind,
+  PlacementIconId,
   Exchange,
   ExchangeAccount,
   TgDraft,
@@ -35,6 +36,7 @@ const toPlacement = (r: Row): Placement => ({
   address: (r.address as string | null) ?? null,
   exchange: (r.exchange as Exchange | null) ?? null,
   exchange_account: (r.exchange_account as ExchangeAccount | null) ?? null,
+  icon: (r.icon as PlacementIconId | null) ?? null,
   comment: (r.comment as string | null) ?? null,
   chain_checked_at: (r.chain_checked_at as string | null) ?? null,
   trx_amount: r.trx_amount === null ? null : fromMicro(Number(r.trx_amount)),
@@ -189,7 +191,7 @@ export async function getPlacement(id: number): Promise<Placement | null> {
 export async function createPlacement(input: PlacementInput): Promise<Placement> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "INSERT INTO placements (name, amount, kind, address, exchange, exchange_account, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
+    sql: "INSERT INTO placements (name, amount, kind, address, exchange, exchange_account, icon, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
     args: [
       input.name,
       toMicro(input.amount),
@@ -197,6 +199,7 @@ export async function createPlacement(input: PlacementInput): Promise<Placement>
       input.address,
       input.exchange,
       input.exchange_account,
+      input.icon,
       input.comment,
     ],
   });
@@ -212,7 +215,7 @@ export async function updatePlacement(
 ): Promise<Placement | null> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "UPDATE placements SET name = ?, amount = ?, kind = ?, address = ?, exchange = ?, exchange_account = ?, comment = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
+    sql: "UPDATE placements SET name = ?, amount = ?, kind = ?, address = ?, exchange = ?, exchange_account = ?, icon = ?, comment = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
     args: [
       input.name,
       toMicro(input.amount),
@@ -220,6 +223,7 @@ export async function updatePlacement(
       input.address,
       input.exchange,
       input.exchange_account,
+      input.icon,
       input.comment,
       id,
     ],

@@ -28,8 +28,13 @@ import {
   type Exchange,
   type ExchangeAccount,
   type Placement,
+  type PlacementIconId,
   type PlacementKind,
 } from "@/types";
+import { PlacementIcon, PLACEMENT_ICON_OPTIONS } from "@/components/PlacementIcon";
+
+// Значение-заглушка для варианта «без иконки» (Select не допускает пустой value).
+const NO_ICON = "__none__";
 
 const KIND_LABELS: Record<PlacementKind, string> = {
   wallet: "Внешний кошелёк",
@@ -66,6 +71,7 @@ export function PlacementForm({
       address: placement?.address ?? "",
       exchange: placement?.exchange ?? null,
       exchange_account: placement?.exchange_account ?? null,
+      icon: placement?.icon ?? null,
       comment: placement?.comment ?? "",
     },
   });
@@ -73,6 +79,7 @@ export function PlacementForm({
   const kind = watch("kind");
   const exchange = watch("exchange");
   const exchangeAccount = watch("exchange_account");
+  const icon = watch("icon");
 
   const submitting = create.isPending || update.isPending;
 
@@ -183,6 +190,32 @@ export function PlacementForm({
           <Input id="p-address" placeholder="Адрес кошелька / счёта" {...register("address")} />
         </div>
       )}
+      <div className="space-y-2">
+        <Label>Иконка</Label>
+        <Select
+          value={icon ?? NO_ICON}
+          onValueChange={(v) =>
+            setValue("icon", v === NO_ICON ? null : (v as PlacementIconId))
+          }
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_ICON}>
+              <span className="text-muted-foreground">Без иконки</span>
+            </SelectItem>
+            {PLACEMENT_ICON_OPTIONS.map((opt) => (
+              <SelectItem key={opt.id} value={opt.id}>
+                <span className="inline-flex items-center gap-2">
+                  <PlacementIcon icon={opt.id} className="size-4" />
+                  {opt.label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="space-y-2">
         <Label htmlFor="p-comment">Комментарий</Label>
         <Textarea id="p-comment" rows={2} {...register("comment")} />

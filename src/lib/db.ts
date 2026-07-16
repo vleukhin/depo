@@ -77,6 +77,14 @@ async function migrate(db: Client) {
     "TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main'))",
     { backfillFromId: false },
   );
+  // Иконка размещения (выбирается вручную), NULL — без иконки.
+  await ensureColumn(
+    db,
+    "placements",
+    "icon",
+    "TEXT CHECK (icon IS NULL OR icon IN ('kucoin','bitget','onekey','tangem'))",
+    { backfillFromId: false },
+  );
   // Дата долга: существующие строки получают дату создания записи.
   await ensureColumn(db, "debts", "date", "TEXT", { backfillFromId: false });
   await db.execute("UPDATE debts SET date = date(created_at) WHERE date IS NULL");
@@ -150,6 +158,7 @@ CREATE TABLE IF NOT EXISTS placements (
   address    TEXT,
   exchange   TEXT    CHECK (exchange IS NULL OR exchange IN ('KuCoin','Bitget')),
   exchange_account TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main')),
+  icon       TEXT    CHECK (icon IS NULL OR icon IN ('kucoin','bitget','onekey','tangem')),
   comment    TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   chain_checked_at TEXT,
