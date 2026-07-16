@@ -2,15 +2,33 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Archive, Pencil, Users } from "lucide-react";
+import { Archive, MoreHorizontal, Pencil, Trash2, Users } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -29,6 +47,8 @@ import type { Debt } from "@/types";
 import { DebtForm } from "./DebtForm";
 import { ManagersDialog } from "@/features/managers/ManagersDialog";
 
+const DELETE_DESC = "Долг переместится в архив. Восстановить можно на странице архива.";
+
 function sourceLabel(debt: Debt): string {
   if (debt.placement_name) return debt.placement_name;
   if (debt.source_text) return debt.source_text;
@@ -42,6 +62,7 @@ export function DebtsSection() {
   const [open, setOpen] = useState(false);
   const [managersOpen, setManagersOpen] = useState(false);
   const [editing, setEditing] = useState<Debt | undefined>(undefined);
+  const [deleting, setDeleting] = useState<Debt | undefined>(undefined);
 
   function openCreate() {
     setEditing(undefined);
@@ -52,6 +73,17 @@ export function DebtsSection() {
     setOpen(true);
   }
 
+  async function confirmDelete() {
+    const target = deleting;
+    if (!target) return;
+    try {
+      await del.mutateAsync(target.id);
+      toast.success("Запись удалена");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
   return (
     <SectionCard
       id="debts"
@@ -60,15 +92,20 @@ export function DebtsSection() {
       onAdd={openCreate}
       actions={
         <>
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" variant="outline" asChild aria-label="Архив">
             <Link href="/archive/debts">
               <Archive className="size-4" />
-              Архив
+              <span className="hidden md:inline">Архив</span>
             </Link>
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setManagersOpen(true)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setManagersOpen(true)}
+            aria-label="Менеджеры"
+          >
             <Users className="size-4" />
-            Менеджеры
+            <span className="hidden md:inline">Менеджеры</span>
           </Button>
         </>
       }
@@ -119,7 +156,7 @@ export function DebtsSection() {
                       <Pencil className="size-4 text-muted-foreground" />
                     </Button>
                     <DeleteButton
-                      description="Долг переместится в архив. Восстановить можно на странице архива."
+                      description={DELETE_DESC}
                       onConfirm={() => del.mutateAsync(debt.id)}
                     />
                   </TableCell>
@@ -137,59 +174,60 @@ export function DebtsSection() {
         </SortableRows>
       </div>
 
-      {/* Мобильный список карточек (§7): отдельный DndContext с теми же id. */}
+      {/* Мобильный компактный список (2 строки на позицию): отдельный DndContext. */}
       <SortableRows ids={debts.map((d) => d.id)} onReorder={(ids) => reorder.mutate(ids)}>
         <ul className="space-y-2 md:hidden">
           {debts.map((debt) => (
             <SortableCard key={debt.id} id={debt.id}>
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-medium">{debt.manager_name ?? "—"}</span>
-                <span className="text-base font-semibold tabular-nums">
-                  {formatUsdt(debt.amount)}
-                </span>
-              </div>
-              <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt>Дата</dt>
-                  <dd className="tabular-nums text-foreground">{formatDate(debt.date)}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt>Сервис</dt>
-                  <dd>
-                    {debt.service ? <Badge variant="secondary">{debt.service}</Badge> : "—"}
-                  </dd>
-                </div>
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt>Откуда взял</dt>
-                  <dd className="text-right text-foreground">{sourceLabel(debt)}</dd>
-                </div>
-                {debt.comment && (
-                  <div>
-                    <dt>Комментарий</dt>
-                    <dd className="mt-0.5 text-foreground">{debt.comment}</dd>
-                  </div>
-                )}
-              </dl>
-              <div className="mt-2 flex items-center justify-end gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-11"
-                  aria-label="Изменить"
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
                   onClick={() => openEdit(debt)}
+                  aria-label={`Изменить долг: ${debt.manager_name ?? ""}`}
+                  className="flex min-w-0 flex-1 flex-col gap-0.5 py-1 text-left outline-none"
                 >
-                  <Pencil className="size-4 text-muted-foreground" />
-                </Button>
-                <DeleteButton
-                  className="size-11"
-                  description="Долг переместится в архив. Восстановить можно на странице архива."
-                  onConfirm={() => del.mutateAsync(debt.id)}
-                />
+                  <div className="flex w-full items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {debt.manager_name ?? "—"}
+                    </span>
+                    <UsdtAmount value={debt.amount} className="shrink-0 text-sm font-semibold" />
+                  </div>
+                  <span className="flex w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="shrink-0 tabular-nums">{formatDate(debt.date)}</span>
+                    <span aria-hidden>·</span>
+                    <span className="shrink-0">{debt.service ?? "—"}</span>
+                    <span aria-hidden>·</span>
+                    <span className="min-w-0 truncate">{sourceLabel(debt)}</span>
+                  </span>
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 shrink-0"
+                      aria-label="Действия"
+                    >
+                      <MoreHorizontal className="size-4 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => openEdit(debt)}>
+                      <Pencil />
+                      Изменить
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(debt)}>
+                      <Trash2 />
+                      Удалить
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </SortableCard>
           ))}
           {!isLoading && debts.length === 0 && (
-            <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3 text-center text-sm text-muted-foreground">
+            <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card px-3 py-4 text-center text-sm text-muted-foreground">
               Пока нет записей
             </li>
           )}
@@ -204,6 +242,19 @@ export function DebtsSection() {
           <DebtForm debt={editing} onDone={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleting} onOpenChange={(v) => !v && setDeleting(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить запись?</AlertDialogTitle>
+            <AlertDialogDescription>{DELETE_DESC}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Удалить</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ManagersDialog open={managersOpen} onOpenChange={setManagersOpen} />
     </SectionCard>

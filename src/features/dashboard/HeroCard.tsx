@@ -14,7 +14,7 @@ function ReconciliationPill({ balanced, diff }: { balanced: boolean; diff: numbe
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1",
+        "inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-xs font-medium ring-1 sm:self-auto",
         negative
           ? "bg-destructive/10 text-destructive ring-destructive/20"
           : "bg-success/10 text-success ring-success/20",
