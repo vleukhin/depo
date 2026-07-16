@@ -11,7 +11,7 @@ export default function Home() {
     <>
       <SiteHeader />
 
-      <section className="mx-auto w-full max-w-6xl px-4 pb-4">
+      <section className="mx-auto w-full max-w-6xl px-4 pb-4 mt-1">
         <div className="grid gap-5 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <HeroCard />
