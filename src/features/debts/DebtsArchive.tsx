@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { ServiceIcon } from "@/components/ServiceIcon";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -71,7 +72,10 @@ export function DebtsArchive() {
                   </TableCell>
                   <TableCell>
                     {debt.service ? (
-                      <Badge variant="secondary">{debt.service}</Badge>
+                      <Badge variant="secondary" className="gap-1.5 pl-1">
+                        <ServiceIcon service={debt.service} className="size-4" />
+                        {debt.service}
+                      </Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -125,7 +129,14 @@ export function DebtsArchive() {
                 <div className="flex items-center justify-between gap-3">
                   <dt>Сервис</dt>
                   <dd>
-                    {debt.service ? <Badge variant="secondary">{debt.service}</Badge> : "—"}
+                    {debt.service ? (
+                      <Badge variant="secondary" className="gap-1.5 pl-1">
+                        <ServiceIcon service={debt.service} className="size-4" />
+                        {debt.service}
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3">

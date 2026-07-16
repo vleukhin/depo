@@ -42,6 +42,7 @@ import { DeleteButton } from "@/components/DeleteButton";
 import { SortableCard, SortableRow, SortableRows } from "@/components/SortableRows";
 import { formatDate, formatUsdt } from "@/lib/format";
 import { UsdtAmount } from "@/components/UsdtAmount";
+import { ServiceIcon } from "@/components/ServiceIcon";
 import { useDebts, useDeleteDebt, useReorderDebts } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
 import { DebtForm } from "./DebtForm";
@@ -137,7 +138,10 @@ export function DebtsSection() {
                   </TableCell>
                   <TableCell>
                     {debt.service ? (
-                      <Badge variant="secondary">{debt.service}</Badge>
+                      <Badge variant="secondary" className="gap-1.5 pl-1">
+                        <ServiceIcon service={debt.service} className="size-4" />
+                        {debt.service}
+                      </Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -195,7 +199,14 @@ export function DebtsSection() {
                   <span className="flex w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="shrink-0 tabular-nums">{formatDate(debt.date)}</span>
                     <span aria-hidden>·</span>
-                    <span className="shrink-0">{debt.service ?? "—"}</span>
+                    {debt.service ? (
+                      <span className="flex shrink-0 items-center gap-1">
+                        <ServiceIcon service={debt.service} className="size-3.5 rounded" />
+                        {debt.service}
+                      </span>
+                    ) : (
+                      <span className="shrink-0">—</span>
+                    )}
                     <span aria-hidden>·</span>
                     <span className="min-w-0 truncate">{sourceLabel(debt)}</span>
                   </span>
