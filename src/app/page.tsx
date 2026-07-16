@@ -10,7 +10,7 @@ export default function Home() {
     <>
       <SiteHeader />
 
-      <section className="mx-auto w-full max-w-6xl px-4 pt-6">
+      <section className="mx-auto w-full max-w-6xl px-4 pt-6 pb-8">
         <HeroCard />
       </section>
 
