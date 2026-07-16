@@ -1,6 +1,6 @@
 "use client";
 
-import { Wallet, MapPin, HandCoins, Scale, Coins } from "lucide-react";
+import { MapPin, HandCoins, Scale, Coins } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { UsdtAmount } from "@/components/UsdtAmount";
@@ -25,8 +25,9 @@ function StatCard({
   return (
     <Card
       className={cn(
-        tone === "ok" && "border-emerald-500/40 bg-emerald-500/5",
-        tone === "bad" && "border-red-500/50 bg-red-500/5",
+        "transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-raised motion-reduce:transform-none motion-reduce:transition-none",
+        tone === "ok" && "border-success/40 bg-success/5",
+        tone === "bad" && "border-destructive/50 bg-destructive/5",
       )}
     >
       <CardContent className="flex items-start gap-3">
@@ -34,25 +35,27 @@ function StatCard({
           className={cn(
             "rounded-md p-2",
             tone === "ok"
-              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+              ? "bg-success/15 text-success"
               : tone === "bad"
-                ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                ? "bg-destructive/15 text-destructive"
                 : "bg-muted text-muted-foreground",
           )}
         >
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-xl font-semibold tabular-nums truncate">{value}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="text-2xl font-semibold tabular-nums truncate">{value}</p>
           {hint && (
             <p
               className={cn(
                 "text-xs mt-0.5",
                 tone === "ok"
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-success"
                   : tone === "bad"
-                    ? "text-red-600 dark:text-red-400"
+                    ? "text-destructive"
                     : "text-muted-foreground",
               )}
             >
@@ -69,7 +72,6 @@ export function DashboardCards() {
   const { data } = useSummary();
   const { data: trxPrice } = useTrxPrice();
 
-  const funds = data?.total_funds ?? 0;
   const placed = data?.total_placements ?? 0;
   const debts = data?.total_debts ?? 0;
   const diff = data?.diff ?? 0;
@@ -79,12 +81,7 @@ export function DashboardCards() {
   const trxUsd = trxPrice?.price != null ? totalTrx * trxPrice.price : null;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      <StatCard
-        icon={<Wallet className="size-5" />}
-        label="Всего в депо"
-        value={<UsdtAmount value={funds} />}
-      />
+    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
       <StatCard
         icon={<MapPin className="size-5" />}
         label="Размещено"

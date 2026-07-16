@@ -78,6 +78,12 @@ export function TrxChartCard() {
             <ResponsiveContainer width="100%" height="100%">
               {/* Ось X категориальная: дни, пропущенные кроном, соединяются линией через разрыв. */}
               <AreaChart data={points} margin={{ top: 8, right: 8 }}>
+                <defs>
+                  <linearGradient id="trxFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.25} />
+                    <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid vertical={false} stroke="var(--border)" />
                 <XAxis
                   dataKey="date"
@@ -99,10 +105,9 @@ export function TrxChartCard() {
                 <Area
                   type="monotone"
                   dataKey="trx_amount"
-                  stroke="var(--primary)"
+                  stroke="var(--chart-1)"
                   strokeWidth={2}
-                  fill="var(--primary)"
-                  fillOpacity={0.12}
+                  fill="url(#trxFill)"
                   dot={false}
                   activeDot={{ r: 4 }}
                 />
