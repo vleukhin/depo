@@ -2,15 +2,32 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Archive, Pencil, Plus, RefreshCw } from "lucide-react";
+import { Archive, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -36,6 +53,18 @@ import type { Placement } from "@/types";
 import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
 import { TrxTopUpDialog } from "./TrxTopUpDialog";
 
+const DELETE_DESC =
+  "Размещение переместится в архив. Пока оно там, у связанных долгов источник не отображается. Восстановить можно на странице архива.";
+
+/** Короткое место размещения для компактной мобильной строки. */
+function placementLocation(p: Placement): string {
+  if (p.kind === "exchange" && p.exchange && p.exchange_account) {
+    return `${p.exchange} · ${ACCOUNT_LABELS[p.exchange_account]}`;
+  }
+  if (p.address) return `${p.address.slice(0, 6)}…${p.address.slice(-4)}`;
+  return "—";
+}
+
 export function PlacementsSection() {
   const { data: placements = [], isLoading } = usePlacements();
   const del = useDeletePlacement();
@@ -44,6 +73,7 @@ export function PlacementsSection() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Placement | undefined>(undefined);
   const [topUp, setTopUp] = useState<Placement | undefined>(undefined);
+  const [deleting, setDeleting] = useState<Placement | undefined>(undefined);
 
   function openCreate() {
     setEditing(undefined);
@@ -52,6 +82,17 @@ export function PlacementsSection() {
   function openEdit(placement: Placement) {
     setEditing(placement);
     setOpen(true);
+  }
+
+  async function confirmDelete() {
+    const target = deleting;
+    if (!target) return;
+    try {
+      await del.mutateAsync(target.id);
+      toast.success("Запись удалена");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   }
 
   async function checkBalances() {
@@ -183,7 +224,7 @@ export function PlacementsSection() {
                       <Pencil className="size-4 text-muted-foreground" />
                     </Button>
                     <DeleteButton
-                      description="Размещение переместится в архив. Пока оно там, у связанных долгов источник не отображается. Восстановить можно на странице архива."
+                      description={DELETE_DESC}
                       onConfirm={() => del.mutateAsync(p.id)}
                     />
                   </TableCell>
@@ -201,7 +242,7 @@ export function PlacementsSection() {
         </SortableRows>
       </div>
 
-      {/* Мобильный список карточек (§7): отдельный DndContext с теми же id. */}
+      {/* Мобильный компактный список (2 строки на позицию): отдельный DndContext. */}
       <SortableRows
         ids={placements.map((p) => p.id)}
         onReorder={(ids) => reorder.mutate(ids)}
@@ -209,87 +250,61 @@ export function PlacementsSection() {
         <ul className="space-y-2 md:hidden">
           {placements.map((p) => (
             <SortableCard key={p.id} id={p.id}>
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-medium">{p.name}</span>
-                <span
-                  className="text-base font-semibold"
-                  title={
-                    p.chain_checked_at
-                      ? `Обновлено автоматически: ${p.chain_checked_at} UTC`
-                      : undefined
-                  }
-                >
-                  <UsdtAmount value={p.amount} />
-                </span>
-              </div>
-              <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">
-                <div className="flex min-h-11 items-center justify-between gap-3">
-                  <dt>TRX</dt>
-                  <dd
-                    className="inline-flex items-center gap-1 tabular-nums"
-                    title={
-                      p.chain_checked_at
-                        ? `Обновлено автоматически: ${p.chain_checked_at} UTC`
-                        : undefined
-                    }
-                  >
-                    {p.trx_amount != null ? <TrxAmount value={p.trx_amount} /> : "—"}
-                    {p.kind === "wallet" && isTronAddress(p.address) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-11"
-                        aria-label="Пополнить TRX"
-                        title="Пополнить TRX с биржи"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setTopUp(p);
-                        }}
-                      >
-                        <Plus className="size-4" />
-                      </Button>
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Адрес / счёт</dt>
-                  <dd className="mt-0.5 overflow-x-auto">
-                    {p.kind === "exchange" && p.exchange && p.exchange_account ? (
-                      <span className="text-foreground">
-                        {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
-                      </span>
-                    ) : (
-                      <AddressCell address={p.address} />
-                    )}
-                  </dd>
-                </div>
-                {p.comment && (
-                  <div>
-                    <dt>Комментарий</dt>
-                    <dd className="mt-0.5 text-foreground">{p.comment}</dd>
-                  </div>
-                )}
-              </dl>
-              <div className="mt-2 flex items-center justify-end gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-11"
-                  aria-label="Изменить"
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
                   onClick={() => openEdit(p)}
+                  aria-label={`Изменить: ${p.name}`}
+                  className="flex min-w-0 flex-1 flex-col gap-0.5 py-1 text-left outline-none"
                 >
-                  <Pencil className="size-4 text-muted-foreground" />
-                </Button>
-                <DeleteButton
-                  className="size-11"
-                  description="Размещение переместится в архив. Пока оно там, у связанных долгов источник не отображается. Восстановить можно на странице архива."
-                  onConfirm={() => del.mutateAsync(p.id)}
-                />
+                  <div className="flex w-full items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
+                    <UsdtAmount value={p.amount} className="shrink-0 text-sm font-semibold" />
+                  </div>
+                  <span className="flex w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="min-w-0 truncate">{placementLocation(p)}</span>
+                    {p.trx_amount != null && (
+                      <span className="flex shrink-0 items-center gap-1">
+                        <span aria-hidden>·</span>
+                        <TrxAmount value={p.trx_amount} iconClassName="size-3" />
+                      </span>
+                    )}
+                  </span>
+                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 shrink-0"
+                      aria-label="Действия"
+                    >
+                      <MoreHorizontal className="size-4 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => openEdit(p)}>
+                      <Pencil />
+                      Изменить
+                    </DropdownMenuItem>
+                    {p.kind === "wallet" && isTronAddress(p.address) && (
+                      <DropdownMenuItem onSelect={() => setTopUp(p)}>
+                        <Plus />
+                        Пополнить TRX
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(p)}>
+                      <Trash2 />
+                      Удалить
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </SortableCard>
           ))}
           {!isLoading && placements.length === 0 && (
-            <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3 text-center text-sm text-muted-foreground">
+            <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card px-3 py-4 text-center text-sm text-muted-foreground">
               Пока нет записей
             </li>
           )}
@@ -304,6 +319,22 @@ export function PlacementsSection() {
           <PlacementForm placement={editing} onDone={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(v) => !v && setDeleting(undefined)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить запись?</AlertDialogTitle>
+            <AlertDialogDescription>{DELETE_DESC}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Удалить</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {topUp && (
         <TrxTopUpDialog

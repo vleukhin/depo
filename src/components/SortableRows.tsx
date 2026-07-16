@@ -89,8 +89,8 @@ export function SortableRow({
 }
 
 /**
- * Мобильный аналог SortableRow: карточка-`<li>` с ручкой перетаскивания слева.
- * Оболочка карточки (§7.1) уже включена; крупная ручка (≥44px) несёт listeners.
+ * Мобильный аналог SortableRow: компактная карточка-`<li>` с тонкой ручкой
+ * перетаскивания слева (на всю высоту карточки — удобная зона захвата).
  */
 export function SortableCard({
   id,
@@ -109,7 +109,7 @@ export function SortableCard({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "flex items-stretch gap-2 rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3",
+        "flex items-stretch gap-1 rounded-lg ring-1 ring-foreground/10 bg-card shadow-card py-1.5 pr-1.5 pl-1",
         isDragging && "relative z-10 opacity-60 shadow-raised",
         className,
       )}
@@ -117,7 +117,7 @@ export function SortableCard({
       <button
         type="button"
         aria-label="Переместить"
-        className="flex size-11 shrink-0 items-center justify-center self-start rounded-md text-muted-foreground/60 hover:text-muted-foreground touch-none cursor-grab active:cursor-grabbing"
+        className="flex w-7 shrink-0 items-center justify-center self-stretch rounded-md text-muted-foreground/50 hover:text-muted-foreground touch-none cursor-grab active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
