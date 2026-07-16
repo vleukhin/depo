@@ -55,7 +55,7 @@ export function HeroCard() {
             setFundsOpen(true);
           }
         }}
-        className="group relative cursor-pointer overflow-hidden bg-[linear-gradient(180deg,oklch(0.55_0.23_285/0.06),transparent_45%)] shadow-card outline-none transition-shadow hover:shadow-raised focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="group relative h-full cursor-pointer overflow-hidden bg-[linear-gradient(180deg,oklch(0.55_0.23_285/0.06),transparent_45%)] shadow-card outline-none transition-shadow hover:shadow-raised focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">

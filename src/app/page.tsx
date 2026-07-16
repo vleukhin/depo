@@ -1,5 +1,6 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { HeroCard } from "@/features/dashboard/HeroCard";
+import { TrxHeroCard } from "@/features/dashboard/TrxHeroCard";
 import { DepoStructureCard } from "@/features/dashboard/DepoStructureCard";
 import { TrxChartCard } from "@/features/dashboard/TrxChartCard";
 import { PlacementsSection } from "@/features/placements/PlacementsSection";
@@ -10,8 +11,13 @@ export default function Home() {
     <>
       <SiteHeader />
 
-      <section className="mx-auto w-full max-w-6xl px-4 pt-6 pb-8">
-        <HeroCard />
+      <section className="mx-auto w-full max-w-6xl px-4 pb-4">
+        <div className="grid gap-5 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <HeroCard />
+          </div>
+          <TrxHeroCard />
+        </div>
       </section>
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-12 space-y-8">
