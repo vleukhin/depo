@@ -45,7 +45,7 @@ export function DebtsArchive() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -103,6 +103,67 @@ export function DebtsArchive() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Мобильный список карточек (§7): без drag и правки, только восстановление. */}
+        <ul className="space-y-2 md:hidden">
+          {debts.map((debt) => (
+            <li
+              key={debt.id}
+              className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-medium">{debt.manager_name ?? "—"}</span>
+                <span className="text-base font-semibold tabular-nums">
+                  {formatUsdt(debt.amount)}
+                </span>
+              </div>
+              <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt>Дата</dt>
+                  <dd className="tabular-nums text-foreground">{formatDate(debt.date)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt>Сервис</dt>
+                  <dd>
+                    {debt.service ? <Badge variant="secondary">{debt.service}</Badge> : "—"}
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt>Откуда взял</dt>
+                  <dd className="text-right text-foreground">
+                    <SourceCell debt={debt} />
+                  </dd>
+                </div>
+                {debt.comment && (
+                  <div>
+                    <dt>Комментарий</dt>
+                    <dd className="mt-0.5 text-foreground">{debt.comment}</dd>
+                  </div>
+                )}
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt>Удалено</dt>
+                  <dd
+                    className="tabular-nums"
+                    title={debt.deleted_at ? `${debt.deleted_at} UTC` : undefined}
+                  >
+                    {debt.deleted_at ? formatDate(debt.deleted_at.slice(0, 10)) : "—"}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-2 flex items-center justify-end gap-1">
+                <RestoreButton
+                  className="size-11"
+                  onConfirm={() => restore.mutateAsync(debt.id)}
+                />
+              </div>
+            </li>
+          ))}
+          {!isLoading && debts.length === 0 && (
+            <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3 text-center text-sm text-muted-foreground">
+              Архив пуст
+            </li>
+          )}
+        </ul>
       </CardContent>
     </Card>
   );

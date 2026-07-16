@@ -18,9 +18,11 @@ import { Button } from "@/components/ui/button";
 export function DeleteButton({
   onConfirm,
   description = "Запись будет удалена без возможности восстановления.",
+  className,
 }: {
   onConfirm: () => Promise<unknown>;
   description?: string;
+  className?: string;
 }) {
   async function handle() {
     try {
@@ -34,7 +36,7 @@ export function DeleteButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Удалить">
+        <Button variant="ghost" size="icon" aria-label="Удалить" className={className}>
           <Trash2 className="size-4 text-muted-foreground" />
         </Button>
       </AlertDialogTrigger>

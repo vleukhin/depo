@@ -87,3 +87,43 @@ export function SortableRow({
     </TableRow>
   );
 }
+
+/**
+ * Мобильный аналог SortableRow: карточка-`<li>` с ручкой перетаскивания слева.
+ * Оболочка карточки (§7.1) уже включена; крупная ручка (≥44px) несёт listeners.
+ */
+export function SortableCard({
+  id,
+  children,
+  className,
+}: {
+  id: number;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id });
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        "flex items-stretch gap-2 rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3",
+        isDragging && "relative z-10 opacity-60 shadow-raised",
+        className,
+      )}
+    >
+      <button
+        type="button"
+        aria-label="Переместить"
+        className="flex size-11 shrink-0 items-center justify-center self-start rounded-md text-muted-foreground/60 hover:text-muted-foreground touch-none cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <div className="min-w-0 flex-1">{children}</div>
+    </li>
+  );
+}

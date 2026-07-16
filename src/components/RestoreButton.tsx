@@ -5,7 +5,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 /** Восстановление записи из архива. Без подтверждения — действие неразрушающее. */
-export function RestoreButton({ onConfirm }: { onConfirm: () => Promise<unknown> }) {
+export function RestoreButton({
+  onConfirm,
+  className,
+}: {
+  onConfirm: () => Promise<unknown>;
+  className?: string;
+}) {
   async function handle() {
     try {
       await onConfirm();
@@ -21,6 +27,7 @@ export function RestoreButton({ onConfirm }: { onConfirm: () => Promise<unknown>
       size="icon"
       aria-label="Восстановить"
       title="Восстановить из архива"
+      className={className}
       onClick={handle}
     >
       <ArchiveRestore className="size-4 text-muted-foreground" />

@@ -46,43 +46,79 @@ export function FundsSection() {
       description="Из чего состоит депо"
       onAdd={openCreate}
     >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Название</TableHead>
-            <TableHead className="text-right">Сумма</TableHead>
-            <TableHead className="w-24" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {funds.map((fund) => (
-            <TableRow key={fund.id}>
-              <TableCell className="font-medium">{fund.name}</TableCell>
-              <TableCell className="text-right">
-                <UsdtAmount value={fund.amount} />
-              </TableCell>
-              <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Изменить"
-                  onClick={() => openEdit(fund)}
-                >
-                  <Pencil className="size-4 text-muted-foreground" />
-                </Button>
-                <DeleteButton onConfirm={() => del.mutateAsync(fund.id)} />
-              </TableCell>
-            </TableRow>
-          ))}
-          {!isLoading && funds.length === 0 && (
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                Пока нет записей
-              </TableCell>
+              <TableHead>Название</TableHead>
+              <TableHead className="text-right">Сумма</TableHead>
+              <TableHead className="w-24" />
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {funds.map((fund) => (
+              <TableRow key={fund.id}>
+                <TableCell className="font-medium">{fund.name}</TableCell>
+                <TableCell className="text-right">
+                  <UsdtAmount value={fund.amount} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Изменить"
+                    onClick={() => openEdit(fund)}
+                  >
+                    <Pencil className="size-4 text-muted-foreground" />
+                  </Button>
+                  <DeleteButton onConfirm={() => del.mutateAsync(fund.id)} />
+                </TableCell>
+              </TableRow>
+            ))}
+            {!isLoading && funds.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                  Пока нет записей
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Мобильный список карточек (§7): средства не сортируются. */}
+      <ul className="space-y-2 md:hidden">
+        {funds.map((fund) => (
+          <li
+            key={fund.id}
+            className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="font-medium">{fund.name}</span>
+              <span className="text-base font-semibold">
+                <UsdtAmount value={fund.amount} />
+              </span>
+            </div>
+            <div className="mt-2 flex items-center justify-end gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-11"
+                aria-label="Изменить"
+                onClick={() => openEdit(fund)}
+              >
+                <Pencil className="size-4 text-muted-foreground" />
+              </Button>
+              <DeleteButton className="size-11" onConfirm={() => del.mutateAsync(fund.id)} />
+            </div>
+          </li>
+        ))}
+        {!isLoading && funds.length === 0 && (
+          <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3 text-center text-sm text-muted-foreground">
+            Пока нет записей
+          </li>
+        )}
+      </ul>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

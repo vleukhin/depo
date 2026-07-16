@@ -22,7 +22,7 @@ import {
 import { SectionCard } from "@/components/SectionCard";
 import { AddressCell } from "@/components/AddressCell";
 import { DeleteButton } from "@/components/DeleteButton";
-import { SortableRow, SortableRows } from "@/components/SortableRows";
+import { SortableCard, SortableRow, SortableRows } from "@/components/SortableRows";
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { TrxAmount } from "@/components/TrxAmount";
 import { isTronAddress } from "@/lib/tron";
@@ -99,7 +99,7 @@ export function PlacementsSection() {
         </>
       }
     >
-      <div className="overflow-x-auto">
+      <div className="hidden overflow-x-auto md:block">
         <SortableRows
           ids={placements.map((p) => p.id)}
           onReorder={(ids) => reorder.mutate(ids)}
@@ -200,6 +200,101 @@ export function PlacementsSection() {
           </Table>
         </SortableRows>
       </div>
+
+      {/* Мобильный список карточек (§7): отдельный DndContext с теми же id. */}
+      <SortableRows
+        ids={placements.map((p) => p.id)}
+        onReorder={(ids) => reorder.mutate(ids)}
+      >
+        <ul className="space-y-2 md:hidden">
+          {placements.map((p) => (
+            <SortableCard key={p.id} id={p.id}>
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-medium">{p.name}</span>
+                <span
+                  className="text-base font-semibold"
+                  title={
+                    p.chain_checked_at
+                      ? `Обновлено автоматически: ${p.chain_checked_at} UTC`
+                      : undefined
+                  }
+                >
+                  <UsdtAmount value={p.amount} />
+                </span>
+              </div>
+              <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+                <div className="flex min-h-11 items-center justify-between gap-3">
+                  <dt>TRX</dt>
+                  <dd
+                    className="inline-flex items-center gap-1 tabular-nums"
+                    title={
+                      p.chain_checked_at
+                        ? `Обновлено автоматически: ${p.chain_checked_at} UTC`
+                        : undefined
+                    }
+                  >
+                    {p.trx_amount != null ? <TrxAmount value={p.trx_amount} /> : "—"}
+                    {p.kind === "wallet" && isTronAddress(p.address) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-11"
+                        aria-label="Пополнить TRX"
+                        title="Пополнить TRX с биржи"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTopUp(p);
+                        }}
+                      >
+                        <Plus className="size-4" />
+                      </Button>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Адрес / счёт</dt>
+                  <dd className="mt-0.5 overflow-x-auto">
+                    {p.kind === "exchange" && p.exchange && p.exchange_account ? (
+                      <span className="text-foreground">
+                        {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
+                      </span>
+                    ) : (
+                      <AddressCell address={p.address} />
+                    )}
+                  </dd>
+                </div>
+                {p.comment && (
+                  <div>
+                    <dt>Комментарий</dt>
+                    <dd className="mt-0.5 text-foreground">{p.comment}</dd>
+                  </div>
+                )}
+              </dl>
+              <div className="mt-2 flex items-center justify-end gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-11"
+                  aria-label="Изменить"
+                  onClick={() => openEdit(p)}
+                >
+                  <Pencil className="size-4 text-muted-foreground" />
+                </Button>
+                <DeleteButton
+                  className="size-11"
+                  description="Размещение переместится в архив. Пока оно там, у связанных долгов источник не отображается. Восстановить можно на странице архива."
+                  onConfirm={() => del.mutateAsync(p.id)}
+                />
+              </div>
+            </SortableCard>
+          ))}
+          {!isLoading && placements.length === 0 && (
+            <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3 text-center text-sm text-muted-foreground">
+              Пока нет записей
+            </li>
+          )}
+        </ul>
+      </SortableRows>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">
