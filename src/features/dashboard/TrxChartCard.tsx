@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { TrxAmount } from "@/components/TrxAmount";
 import { formatAmount, formatDate, formatDateShort } from "@/lib/format";
 import { useTrxSnapshots } from "@/hooks/useTrxSnapshots";
+import { useSummary } from "@/hooks/useSummary";
+import { useTrxPrice } from "@/hooks/useTrxPrice";
 import type { TrxSnapshot } from "@/types";
 
 const PERIODS = [7, 30, 90] as const;
@@ -50,6 +52,12 @@ export function TrxChartCard() {
   const { data } = useTrxSnapshots(days);
   const points = data ?? [];
 
+  // Текущий суммарный TRX (перенесён из карточек статистики) + оценка в $.
+  const { data: summary } = useSummary();
+  const { data: trxPrice } = useTrxPrice();
+  const totalTrx = summary?.total_trx ?? 0;
+  const trxUsd = trxPrice?.price != null ? totalTrx * trxPrice.price : null;
+
   return (
     <Card>
       <CardHeader>
@@ -69,6 +77,19 @@ export function TrxChartCard() {
         </CardAction>
       </CardHeader>
       <CardContent>
+        {/* Текущий суммарный TRX — всегда виден, даже когда график ещё пуст. */}
+        <div className="mb-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Всего TRX
+          </p>
+          <div className="flex items-baseline gap-2">
+            <TrxAmount value={totalTrx} className="text-2xl font-semibold" />
+            <span className="text-xs text-muted-foreground">
+              {trxUsd != null ? `≈ ${formatAmount(trxUsd)} $` : "Не входит в сверку"}
+            </span>
+          </div>
+        </div>
+
         {points.length < 2 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             Пока мало данных — график появится после первых ежедневных снимков баланса
