@@ -22,7 +22,7 @@ export default function Home() {
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-12 space-y-8">
         {/* Ряд диаграмм: структура депо (донат) и динамика TRX. */}
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-5 lg:grid-cols-2 mb-6">
           <DepoStructureCard />
           <TrxChartCard />
         </div>

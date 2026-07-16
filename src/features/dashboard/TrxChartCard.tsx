@@ -54,7 +54,7 @@ export function TrxChartCard() {
     <Card>
       <CardHeader>
         <CardTitle>Динамика TRX</CardTitle>
-        <CardDescription>Суммарный TRX по всем размещениям на конец дня</CardDescription>
+        <CardDescription>Суммарный TRX на конец дня</CardDescription>
         <CardAction className="flex gap-1">
           {PERIODS.map((p) => (
             <Button
