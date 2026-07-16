@@ -30,7 +30,7 @@ export function PlacementsArchive() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -78,6 +78,57 @@ export function PlacementsArchive() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Мобильный список карточек (§7): без drag и правки, только восстановление. */}
+        <ul className="space-y-2 md:hidden">
+          {placements.map((p) => (
+            <li
+              key={p.id}
+              className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="font-medium">{p.name}</span>
+              </div>
+              <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+                <div>
+                  <dt>Адрес / счёт</dt>
+                  <dd className="mt-0.5 overflow-x-auto">
+                    {p.kind === "exchange" && p.exchange && p.exchange_account ? (
+                      <span className="text-foreground">
+                        {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
+                      </span>
+                    ) : (
+                      <AddressCell address={p.address} />
+                    )}
+                  </dd>
+                </div>
+                {p.comment && (
+                  <div>
+                    <dt>Комментарий</dt>
+                    <dd className="mt-0.5 text-foreground">{p.comment}</dd>
+                  </div>
+                )}
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt>Удалено</dt>
+                  <dd
+                    className="tabular-nums"
+                    title={p.deleted_at ? `${p.deleted_at} UTC` : undefined}
+                  >
+                    {p.deleted_at ? formatDate(p.deleted_at.slice(0, 10)) : "—"}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-2 flex items-center justify-end gap-1">
+                <RestoreButton className="size-11" onConfirm={() => restore.mutateAsync(p.id)} />
+              </div>
+            </li>
+          ))}
+          {!isLoading && placements.length === 0 && (
+            <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3 text-center text-sm text-muted-foreground">
+              Архив пуст
+            </li>
+          )}
+        </ul>
       </CardContent>
     </Card>
   );
