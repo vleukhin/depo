@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Archive, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Archive, Copy, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +63,16 @@ function placementLocation(p: Placement): string {
   }
   if (p.address) return `${p.address.slice(0, 6)}…${p.address.slice(-4)}`;
   return "—";
+}
+
+/** Копирование адреса в буфер (та же логика/тексты, что в CopyButton). */
+async function copyAddress(address: string) {
+  try {
+    await navigator.clipboard.writeText(address);
+    toast.success("Адрес скопирован");
+  } catch {
+    toast.error("Не удалось скопировать");
+  }
 }
 
 export function PlacementsSection() {
@@ -290,6 +300,12 @@ export function PlacementsSection() {
                       <Pencil />
                       Изменить
                     </DropdownMenuItem>
+                    {p.address && (
+                      <DropdownMenuItem onSelect={() => copyAddress(p.address!)}>
+                        <Copy />
+                        Копировать адрес
+                      </DropdownMenuItem>
+                    )}
                     {p.kind === "wallet" && isTronAddress(p.address) && (
                       <DropdownMenuItem onSelect={() => setTopUp(p)}>
                         <Plus />
