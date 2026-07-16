@@ -133,7 +133,7 @@ export function DebtsSection() {
                     {formatDate(debt.date)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatUsdt(debt.amount)}
+                    <UsdtAmount value={debt.amount} />
                   </TableCell>
                   <TableCell>
                     {debt.service ? (
