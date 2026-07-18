@@ -1,10 +1,14 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { History } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoutButton } from "@/components/LogoutButton";
+import { SnapshotCreateButton } from "@/features/snapshots/SnapshotCreateButton";
 
-/** Прилипающая верхняя панель: монограмма + логотип, переключатель темы и выход.
+/** Прилипающая верхняя панель: монограмма + логотип, снимки депо, переключатель темы и выход.
  *  Нижняя граница появляется только после прокрутки (data-scrolled). */
 export function SiteHeader() {
   const [scrolled, setScrolled] = React.useState(false);
@@ -29,6 +33,12 @@ export function SiteHeader() {
           <span className="font-semibold tracking-tight">Депо</span>
         </div>
         <div className="flex items-center gap-1">
+          <SnapshotCreateButton iconOnly />
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/snapshots" aria-label="Снимки депо" title="Снимки депо">
+              <History className="size-4" />
+            </Link>
+          </Button>
           <ThemeToggle />
           <LogoutButton />
         </div>

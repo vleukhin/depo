@@ -26,6 +26,19 @@ export function formatDate(value: string | Date): string {
   return dateFormatter.format(d);
 }
 
+const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** UTC-строка БД "2026-07-12 18:30:00" -> "12.07.2026, 21:30" в местном времени. */
+export function formatDateTime(utc: string): string {
+  return dateTimeFormatter.format(new Date(`${utc.replace(" ", "T")}Z`));
+}
+
 const shortDateFormatter = new Intl.DateTimeFormat("ru-RU", {
   day: "2-digit",
   month: "2-digit",
