@@ -202,6 +202,20 @@ CREATE TABLE IF NOT EXISTS trx_snapshots (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Снимки состояния депо: замороженная копия всех блоков (средства, размещения,
+-- долги) на момент нажатия кнопки. Итоги — micro-USDT (total_trx — SUN), data —
+-- JSON с доменными объектами (десятичные суммы, как отдаёт API).
+CREATE TABLE IF NOT EXISTS depo_snapshots (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  comment          TEXT,
+  total_funds      INTEGER NOT NULL,
+  total_placements INTEGER NOT NULL,
+  total_debts      INTEGER NOT NULL,
+  total_trx        INTEGER NOT NULL,
+  data             TEXT    NOT NULL,
+  created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Дедупликация обновлений Telegram: вебхук может доставить один update повторно.
 CREATE TABLE IF NOT EXISTS tg_updates (
   update_id  INTEGER PRIMARY KEY,

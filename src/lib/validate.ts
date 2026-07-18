@@ -83,6 +83,11 @@ export const debtInput = z.object({
   comment: optionalText,
 });
 
+// Снимок состояния депо: с клиента приходит только необязательный комментарий.
+export const snapshotInput = z.object({
+  comment: optionalText,
+});
+
 export const reorderInput = z.object({
   ids: z.array(z.number().int().positive()).min(1),
 });
@@ -114,6 +119,7 @@ export type FundInput = z.infer<typeof fundInput>;
 export type ManagerInput = z.infer<typeof managerInput>;
 export type PlacementInput = z.infer<typeof placementInput>;
 export type DebtInput = z.infer<typeof debtInput>;
+export type SnapshotInput = z.infer<typeof snapshotInput>;
 export type TrxWithdrawInput = z.infer<typeof trxWithdrawInput>;
 export type ParsedRequestOutput = z.infer<typeof parsedRequest>;
 

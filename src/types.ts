@@ -91,6 +91,26 @@ export interface Summary {
   balanced: boolean;
 }
 
+// Снимок состояния депо: строка списка (итоги без содержимого блоков).
+export interface DepoSnapshot {
+  id: number;
+  comment: string | null;
+  total_funds: number;
+  total_placements: number;
+  total_debts: number;
+  total_trx: number; // суммарный TRX (информационно)
+  diff: number; // (размещено + долги) − депо на момент снимка
+  balanced: boolean;
+  created_at: string; // UTC-момент создания снимка
+}
+
+// Полный снимок: замороженные копии всех блоков на момент создания.
+export interface DepoSnapshotDetail extends DepoSnapshot {
+  funds: Fund[];
+  placements: Placement[];
+  debts: Debt[];
+}
+
 // Снимок суммарного TRX за день. Сумма — десятичные TRX.
 export interface TrxSnapshot {
   date: string; // календарный день по МСК (YYYY-MM-DD)
