@@ -135,10 +135,7 @@ export function DebtsSection() {
                     {formatDate(debt.date)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    <span className="inline-flex items-center justify-end gap-1.5">
-                      <UsdtAmount value={debt.amount} />
-                      <TxLink txId={debt.tx_id} />
-                    </span>
+                    <UsdtAmount value={debt.amount} />
                   </TableCell>
                   <TableCell>
                     {debt.service ? (
@@ -150,7 +147,12 @@ export function DebtsSection() {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{sourceLabel(debt)}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      {sourceLabel(debt)}
+                      <TxLink txId={debt.tx_id} />
+                    </span>
+                  </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
                     {debt.comment ?? "—"}
                   </TableCell>
