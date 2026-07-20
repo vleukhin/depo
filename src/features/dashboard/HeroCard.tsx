@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils";
 import { useSummary } from "@/hooks/useSummary";
 import { FundsDialog } from "@/features/funds/FundsDialog";
 
-/** Статус сверки как капсула-пилюля. Использует семантические токены success/destructive. */
-function ReconciliationPill({ balanced, diff }: { balanced: boolean; diff: number }) {
+/** Статус сверки как капсула-пилюля. Использует семантические токены success/destructive.
+ *  Экспортируется: страница снимков показывает сверку на момент снимка той же капсулой. */
+export function ReconciliationPill({ balanced, diff }: { balanced: boolean; diff: number }) {
   // Суммы отображаются округлёнными до целых, поэтому расхождение меньше 0.5
   // визуально неотличимо от нуля — показываем «Сходится», а не «Недостача −0».
   const rounded = Math.round(diff);

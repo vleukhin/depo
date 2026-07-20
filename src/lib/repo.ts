@@ -15,8 +15,16 @@ import type {
   TgDraft,
   TgDraftStatus,
   TrxSnapshot,
+  DepoSnapshot,
+  DepoSnapshotDetail,
 } from "@/types";
-import type { FundInput, ManagerInput, PlacementInput, DebtInput } from "@/lib/validate";
+import type {
+  FundInput,
+  ManagerInput,
+  PlacementInput,
+  DebtInput,
+  SnapshotInput,
+} from "@/lib/validate";
 
 // --- Мапперы строк БД (amount в micro-USDT) в доменные типы (amount в USDT) ---
 // Явно перечисляем поля, чтобы в JSON не утекали служебные свойства Row из libSQL.
@@ -466,6 +474,83 @@ export async function listTrxSnapshots(days: number): Promise<TrxSnapshot[]> {
     args: [`-${days - 1} days`],
   });
   return rs.rows.map(toTrxSnapshot);
+}
+
+// ================= DEPO SNAPSHOTS =================
+const toDepoSnapshot = (r: Row): DepoSnapshot => {
+  const funds = Number(r.total_funds);
+  const placements = Number(r.total_placements);
+  const debts = Number(r.total_debts);
+  const diff = placements + debts - funds;
+  return {
+    id: Number(r.id),
+    comment: (r.comment as string | null) ?? null,
+    total_funds: fromMicro(funds),
+    total_placements: fromMicro(placements),
+    total_debts: fromMicro(debts),
+    total_trx: fromMicro(Number(r.total_trx)),
+    diff: fromMicro(diff),
+    balanced: diff === 0,
+    created_at: String(r.created_at),
+  };
+};
+
+/** Создаёт снимок текущего состояния депо: итоги + замороженные копии всех блоков. */
+export async function createDepoSnapshot(input: SnapshotInput): Promise<DepoSnapshotDetail> {
+  // В снимок входят активные записи — ровно то, что пользователь видит на дашборде.
+  const [funds, placements, debts] = await Promise.all([
+    listFunds(),
+    listPlacements(),
+    listDebts(),
+  ]);
+  // Итоги считаем по тем же строкам, что уходят в data, — снимок внутренне согласован.
+  const sum = (rows: { amount: number }[]) => rows.reduce((s, r) => s + toMicro(r.amount), 0);
+  const totalTrx = placements.reduce(
+    (s, p) => s + (p.trx_amount === null ? 0 : toMicro(p.trx_amount)),
+    0,
+  );
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "INSERT INTO depo_snapshots (comment, total_funds, total_placements, total_debts, total_trx, data) VALUES (?, ?, ?, ?, ?, ?)",
+    args: [
+      input.comment,
+      sum(funds),
+      sum(placements),
+      sum(debts),
+      totalTrx,
+      JSON.stringify({ funds, placements, debts }),
+    ],
+  });
+  return (await getDepoSnapshot(Number(rs.lastInsertRowid)))!;
+}
+
+/** Список снимков без содержимого блоков (data не читается), свежие сверху. */
+export async function listDepoSnapshots(): Promise<DepoSnapshot[]> {
+  const db = await getClient();
+  const rs = await db.execute(
+    "SELECT id, comment, total_funds, total_placements, total_debts, total_trx, created_at FROM depo_snapshots ORDER BY id DESC",
+  );
+  return rs.rows.map(toDepoSnapshot);
+}
+
+/** Полный снимок с замороженными копиями блоков. */
+export async function getDepoSnapshot(id: number): Promise<DepoSnapshotDetail | null> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "SELECT * FROM depo_snapshots WHERE id = ?", args: [id] });
+  const row = rs.rows[0];
+  if (!row) return null;
+  const data = JSON.parse(String(row.data)) as Pick<
+    DepoSnapshotDetail,
+    "funds" | "placements" | "debts"
+  >;
+  return { ...toDepoSnapshot(row), ...data };
+}
+
+/** Снимки удаляются жёстко: это независимые копии, архив им не нужен. */
+export async function deleteDepoSnapshot(id: number): Promise<boolean> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "DELETE FROM depo_snapshots WHERE id = ?", args: [id] });
+  return rs.rowsAffected > 0;
 }
 
 // ================= TELEGRAM: ДЕДУП И ЧЕРНОВИКИ =================
