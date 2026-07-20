@@ -62,6 +62,7 @@ const toDebt = (r: Row): Debt => ({
   placement_id: r.placement_id === null ? null : Number(r.placement_id),
   placement_name: (r.placement_name as string | null) ?? null,
   source_text: (r.source_text as string | null) ?? null,
+  tx_id: (r.tx_id as string | null) ?? null,
   comment: (r.comment as string | null) ?? null,
   deleted_at: (r.deleted_at as string | null) ?? null,
   // Колонка есть только в архивной выборке (DEBT_SELECT_ARCHIVE); в остальных undefined -> null.
@@ -291,7 +292,7 @@ async function getDebt(id: number): Promise<Debt> {
 export async function createDebt(input: DebtInput): Promise<Debt> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "INSERT INTO debts (manager_id, amount, date, service, placement_id, source_text, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
+    sql: "INSERT INTO debts (manager_id, amount, date, service, placement_id, source_text, tx_id, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
     args: [
       input.manager_id,
       toMicro(input.amount),
@@ -299,6 +300,7 @@ export async function createDebt(input: DebtInput): Promise<Debt> {
       input.service,
       input.placement_id,
       input.source_text,
+      input.tx_id,
       input.comment,
     ],
   });
@@ -307,7 +309,7 @@ export async function createDebt(input: DebtInput): Promise<Debt> {
 export async function updateDebt(id: number, input: DebtInput): Promise<Debt | null> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "UPDATE debts SET manager_id = ?, amount = ?, date = ?, service = ?, placement_id = ?, source_text = ?, comment = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
+    sql: "UPDATE debts SET manager_id = ?, amount = ?, date = ?, service = ?, placement_id = ?, source_text = ?, tx_id = ?, comment = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
     args: [
       input.manager_id,
       toMicro(input.amount),
@@ -315,6 +317,7 @@ export async function updateDebt(id: number, input: DebtInput): Promise<Debt | n
       input.service,
       input.placement_id,
       input.source_text,
+      input.tx_id,
       input.comment,
       id,
     ],

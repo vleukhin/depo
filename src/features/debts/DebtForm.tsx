@@ -48,13 +48,29 @@ function toYmd(d: Date): string {
 const formSchema = z.object({
   amount: z.number({ message: "Укажите сумму" }).min(0, "Сумма не может быть отрицательной"),
   source_text: z.string().trim().optional(),
+  tx_id: z.string().trim().optional(),
   comment: z.string().trim().optional(),
 });
 type FormValues = z.infer<typeof formSchema>;
 
 type SourceKind = "none" | "placement" | "text";
 
-export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) {
+// Предзаполнение при создании долга из истории транзакций кошелька.
+export type DebtDefaults = {
+  amount?: number;
+  placement_id?: number | null;
+  tx_id?: string;
+};
+
+export function DebtForm({
+  debt,
+  defaults,
+  onDone,
+}: {
+  debt?: Debt;
+  defaults?: DebtDefaults;
+  onDone: () => void;
+}) {
   const { data: placements = [] } = usePlacements();
   const { data: managers = [] } = useManagers();
   const create = useCreateDebt();
@@ -67,11 +83,12 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
     debt?.manager_id ? String(debt.manager_id) : "",
   );
   const [service, setService] = useState<Service | "">(debt?.service ?? "");
+  const initialPlacementId = debt?.placement_id ?? defaults?.placement_id ?? null;
   const [sourceKind, setSourceKind] = useState<SourceKind>(
-    debt?.placement_id ? "placement" : debt?.source_text ? "text" : "none",
+    initialPlacementId ? "placement" : debt?.source_text ? "text" : "none",
   );
   const [placementId, setPlacementId] = useState<string>(
-    debt?.placement_id ? String(debt.placement_id) : "",
+    initialPlacementId ? String(initialPlacementId) : "",
   );
 
   const {
@@ -81,8 +98,9 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      amount: debt?.amount ?? 0,
+      amount: debt?.amount ?? defaults?.amount ?? 0,
       source_text: debt?.source_text ?? "",
+      tx_id: debt?.tx_id ?? defaults?.tx_id ?? "",
       comment: debt?.comment ?? "",
     },
   });
@@ -112,6 +130,7 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
       service: service || null,
       placement_id: sourceKind === "placement" ? Number(placementId) : null,
       source_text: sourceKind === "text" ? values.source_text?.trim() || null : null,
+      tx_id: values.tx_id?.trim() || null,
       comment: values.comment?.trim() || null,
     };
     try {
@@ -250,6 +269,16 @@ export function DebtForm({ debt, onDone }: { debt?: Debt; onDone: () => void }) 
           />
         </div>
       )}
+
+      <div className="space-y-2">
+        <Label htmlFor="d-tx-id">ID транзакции</Label>
+        <Input
+          id="d-tx-id"
+          placeholder="Хэш транзакции (необязательно)"
+          className="font-mono text-xs"
+          {...register("tx_id")}
+        />
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="d-comment">Комментарий</Label>

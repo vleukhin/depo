@@ -80,6 +80,7 @@ export const debtInput = z.object({
     .nullish()
     .transform((v) => v ?? null),
   source_text: optionalText,
+  tx_id: optionalText,
   comment: optionalText,
 });
 

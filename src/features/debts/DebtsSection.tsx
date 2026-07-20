@@ -40,9 +40,10 @@ import {
 import { SectionCard } from "@/components/SectionCard";
 import { DeleteButton } from "@/components/DeleteButton";
 import { SortableCard, SortableRow, SortableRows } from "@/components/SortableRows";
-import { formatDate, formatUsdt } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { ServiceIcon } from "@/components/ServiceIcon";
+import { TxLink } from "@/components/TxLink";
 import { useDebts, useDeleteDebt, useReorderDebts } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
 import { DebtForm } from "./DebtForm";
@@ -134,7 +135,10 @@ export function DebtsSection() {
                     {formatDate(debt.date)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    <UsdtAmount value={debt.amount} />
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      <UsdtAmount value={debt.amount} />
+                      <TxLink txId={debt.tx_id} />
+                    </span>
                   </TableCell>
                   <TableCell>
                     {debt.service ? (
@@ -211,6 +215,12 @@ export function DebtsSection() {
                     <span className="min-w-0 truncate">{sourceLabel(debt)}</span>
                   </span>
                 </button>
+                {debt.tx_id && (
+                  <TxLink
+                    txId={debt.tx_id}
+                    className="flex size-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+                  />
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button

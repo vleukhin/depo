@@ -203,6 +203,7 @@ async function handleCallback(cb: TgCallbackQuery): Promise<void> {
         placement_id: null,
         // Оригинальный текст форварда — в comment; source_text не заполняем.
         source_text: null,
+        tx_id: null,
         comment: draft.comment,
       });
       await updateTgDraft(draft.id, { status: "done" });

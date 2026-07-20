@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Archive, Copy, MoreHorizontal, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Archive,
+  Copy,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +62,7 @@ import {
 import type { Placement } from "@/types";
 import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
 import { TrxTopUpDialog } from "./TrxTopUpDialog";
+import { TransactionsDialog } from "./TransactionsDialog";
 
 const DELETE_DESC =
   "Размещение переместится в архив. Пока оно там, у связанных долгов источник не отображается. Восстановить можно на странице архива.";
@@ -84,6 +94,7 @@ export function PlacementsSection() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Placement | undefined>(undefined);
   const [topUp, setTopUp] = useState<Placement | undefined>(undefined);
+  const [txFor, setTxFor] = useState<Placement | undefined>(undefined);
   const [deleting, setDeleting] = useState<Placement | undefined>(undefined);
 
   function openCreate() {
@@ -168,7 +179,7 @@ export function PlacementsSection() {
                 <TableHead className="text-right">TRX</TableHead>
                 <TableHead>Адрес / счёт</TableHead>
                 <TableHead>Комментарий</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-32" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -234,6 +245,20 @@ export function PlacementsSection() {
                     {p.comment ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
+                    {p.kind === "wallet" && isTronAddress(p.address) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Транзакции"
+                        title="Транзакции кошелька"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTxFor(p);
+                        }}
+                      >
+                        <ArrowLeftRight className="size-4 text-muted-foreground" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -316,10 +341,16 @@ export function PlacementsSection() {
                       </DropdownMenuItem>
                     )}
                     {p.kind === "wallet" && isTronAddress(p.address) && (
-                      <DropdownMenuItem onSelect={() => setTopUp(p)}>
-                        <Plus />
-                        Пополнить TRX
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuItem onSelect={() => setTxFor(p)}>
+                          <ArrowLeftRight />
+                          Транзакции
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setTopUp(p)}>
+                          <Plus />
+                          Пополнить TRX
+                        </DropdownMenuItem>
+                      </>
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(p)}>
@@ -370,6 +401,15 @@ export function PlacementsSection() {
           placement={topUp}
           open
           onOpenChange={(v) => !v && setTopUp(undefined)}
+        />
+      )}
+
+      {txFor && (
+        <TransactionsDialog
+          key={txFor.id}
+          placement={txFor}
+          open
+          onOpenChange={(v) => !v && setTxFor(undefined)}
         />
       )}
     </SectionCard>

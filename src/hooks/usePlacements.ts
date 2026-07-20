@@ -7,6 +7,7 @@ import type {
   ExchangeAccount,
   ExchangeTrxInfo,
   Placement,
+  Trc20Transfer,
   WithdrawTrxResult,
 } from "@/types";
 import type { PlacementInput, TrxWithdrawInput } from "@/lib/validate";
@@ -43,6 +44,18 @@ export function useExchangeTrxInfo(exchange: Exchange, account: ExchangeAccount,
       api.get<ExchangeTrxInfo>(
         `/api/placements/exchange-trx-info?exchange=${exchange}&account=${account}`,
       ),
+    enabled,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+}
+
+/** Последние переводы USDT (TRC-20) по адресу кошелька — для попапа истории транзакций. */
+export function usePlacementTransactions(id: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["placement-transactions", id],
+    queryFn: () => api.get<Trc20Transfer[]>(`/api/placements/${id}/transactions`),
     enabled,
     staleTime: 15_000,
     refetchOnWindowFocus: false,

@@ -7,8 +7,9 @@
 // контракте и не зависят от активации аккаунта.
 
 import { createHash } from "node:crypto";
+import type { Trc20Transfer } from "@/types";
 
-const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+export const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 const TRON_ADDRESS_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 
 export function isTronAddress(value: string | null | undefined): value is string {
@@ -116,6 +117,82 @@ export async function fetchUsdtBalance(address: string): Promise<number> {
     throw new Error("TronGrid: баланс превышает безопасный диапазон");
   }
   return Number(micro);
+}
+
+interface Trc20TransferRow {
+  transaction_id?: string;
+  block_timestamp?: number;
+  from?: string;
+  to?: string;
+  value?: string;
+  token_info?: { symbol?: string; decimals?: number };
+}
+
+interface Trc20TransfersResponse {
+  data?: Trc20TransferRow[];
+  success?: boolean;
+}
+
+/** Строка base-units + число знаков токена -> десятичное число (без потери точности на больших суммах). */
+function transferValueToDecimal(value: string, decimals: number): number {
+  const base = BigInt(value);
+  const divisor = 10n ** BigInt(decimals);
+  const whole = base / divisor;
+  const frac = base % divisor;
+  // Дробную часть добавляем через Number, целую — тоже; суммы USDT далеко в пределах безопасного диапазона.
+  return Number(whole) + Number(frac) / Number(divisor);
+}
+
+/**
+ * Последние `limit` переводов USDT (TRC-20) по адресу через TronGrid REST v1.
+ * Фильтр по контракту USDT; только подтверждённые. На 429 — до 3 повторов с растущей паузой.
+ */
+export async function fetchUsdtTransfers(address: string, limit = 10): Promise<Trc20Transfer[]> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (process.env.TRONGRID_API_KEY) {
+    headers["TRON-PRO-API-KEY"] = process.env.TRONGRID_API_KEY;
+  }
+
+  const addr = address.trim();
+  const url =
+    `https://api.trongrid.io/v1/accounts/${addr}/transactions/trc20` +
+    `?limit=${limit}&only_confirmed=true&contract_address=${USDT_CONTRACT}`;
+
+  let res: Response;
+  let attempt = 0;
+  for (;;) {
+    res = await fetch(url, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    if (res.status !== 429 || attempt >= 3) break;
+    attempt++;
+    await sleep(1000 * attempt); // 1с, 2с, 3с
+  }
+  if (!res.ok) {
+    throw new Error(`TronGrid: HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as Trc20TransfersResponse;
+  const rows = data.data ?? [];
+  const lower = addr.toLowerCase();
+
+  return rows
+    .filter((r) => r.transaction_id && r.value != null && r.from && r.to)
+    .map((r) => {
+      const decimals = r.token_info?.decimals ?? 6;
+      return {
+        tx_id: r.transaction_id as string,
+        from: r.from as string,
+        to: r.to as string,
+        amount: transferValueToDecimal(r.value as string, decimals),
+        symbol: r.token_info?.symbol ?? "USDT",
+        timestamp: r.block_timestamp ?? 0,
+        direction: (r.from as string).toLowerCase() === lower ? "out" : "in",
+      } satisfies Trc20Transfer;
+    });
 }
 
 interface GetAccountResponse {

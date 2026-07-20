@@ -40,6 +40,17 @@ export interface Placement {
   updated_at: string;
 }
 
+// Перевод TRC-20 (USDT) для попапа истории транзакций кошелька. Сумма — десятичные USDT.
+export interface Trc20Transfer {
+  tx_id: string; // хэш транзакции
+  from: string; // отправитель (TRON-адрес)
+  to: string; // получатель (TRON-адрес)
+  amount: number; // сумма перевода в десятичных единицах токена
+  symbol: string; // тикер токена (USDT)
+  timestamp: number; // время блока, мс от эпохи
+  direction: "in" | "out"; // относительно адреса кошелька
+}
+
 export interface CheckBalancesResult {
   checked: number;
   failed: { id: number; name: string; error: string }[];
@@ -75,6 +86,7 @@ export interface Debt {
   placement_id: number | null;
   placement_name: string | null; // подтягивается через LEFT JOIN
   source_text: string | null;
+  tx_id: string | null; // хэш ончейн-транзакции, если долг заведён из истории кошелька
   comment: string | null;
   deleted_at: string | null; // мягкое удаление: NULL — активен
   placement_deleted_at: string | null; // источник-размещение в архиве (заполняется только в архивной выборке)

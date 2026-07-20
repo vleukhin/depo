@@ -110,6 +110,8 @@ async function migrate(db: Client) {
   // Мягкое удаление: NULL — запись активна, иначе UTC-момент удаления.
   await ensureColumn(db, "placements", "deleted_at", "TEXT", { backfillFromId: false });
   await ensureColumn(db, "debts", "deleted_at", "TEXT", { backfillFromId: false });
+  // Хэш ончейн-транзакции, если долг заведён из истории кошелька; NULL — вручную.
+  await ensureColumn(db, "debts", "tx_id", "TEXT", { backfillFromId: false });
 }
 
 async function columnNames(db: Client, table: string): Promise<Set<string>> {
@@ -184,6 +186,7 @@ CREATE TABLE IF NOT EXISTS debts (
   service      TEXT    CHECK (service IS NULL OR service IN ('Lets','Mate','N-Obmen','Currex')),
   placement_id INTEGER,
   source_text  TEXT,
+  tx_id        TEXT,
   comment      TEXT,
   sort_order   INTEGER NOT NULL DEFAULT 0,
   deleted_at   TEXT,

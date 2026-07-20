@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RestoreButton } from "@/components/RestoreButton";
+import { TxLink } from "@/components/TxLink";
 import { formatDate, formatUsdt } from "@/lib/format";
 import { useDeletedDebts, useRestoreDebt } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
@@ -68,7 +69,10 @@ export function DebtsArchive() {
                     {formatDate(debt.date)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatUsdt(debt.amount)}
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      {formatUsdt(debt.amount)}
+                      <TxLink txId={debt.tx_id} />
+                    </span>
                   </TableCell>
                   <TableCell>
                     {debt.service ? (
@@ -117,8 +121,9 @@ export function DebtsArchive() {
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="font-medium">{debt.manager_name ?? "—"}</span>
-                <span className="text-base font-semibold tabular-nums">
+                <span className="inline-flex items-center gap-1.5 text-base font-semibold tabular-nums">
                   {formatUsdt(debt.amount)}
+                  <TxLink txId={debt.tx_id} />
                 </span>
               </div>
               <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">
