@@ -3,9 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeftRight,
   Archive,
   Copy,
+  History,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -256,7 +256,7 @@ export function PlacementsSection() {
                           setTxFor(p);
                         }}
                       >
-                        <ArrowLeftRight className="size-4 text-muted-foreground" />
+                        <History className="size-4 text-muted-foreground" />
                       </Button>
                     )}
                     <Button
@@ -343,7 +343,7 @@ export function PlacementsSection() {
                     {p.kind === "wallet" && isTronAddress(p.address) && (
                       <>
                         <DropdownMenuItem onSelect={() => setTxFor(p)}>
-                          <ArrowLeftRight />
+                          <History />
                           Транзакции
                         </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => setTopUp(p)}>
