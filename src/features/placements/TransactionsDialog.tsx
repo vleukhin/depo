@@ -170,7 +170,7 @@ function TransferRow({
               variant={transfer.debt.deleted ? "outline" : "secondary"}
               className="max-w-32"
             >
-              {transfer.debt.deleted && <Trash2 aria-hidden />}
+              {transfer.debt.deleted}
               <span className={transfer.debt.deleted ? "truncate line-through" : "truncate"}>
                 {transfer.debt.manager_name ?? "Долг"}
               </span>
