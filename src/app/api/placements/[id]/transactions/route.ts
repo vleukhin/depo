@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { handle, notFound, parseId } from "@/lib/api-helpers";
-import { getPlacement } from "@/lib/repo";
+import { findDebtsByTxIds, getPlacement } from "@/lib/repo";
 import { fetchUsdtTransfers, isTronAddress } from "@/lib/tron";
 
 export const runtime = "nodejs";
@@ -14,6 +14,8 @@ export function GET(_request: Request, ctx: RouteContext<"/api/placements/[id]/t
       notFound();
     }
     const transfers = await fetchUsdtTransfers(placement.address, 10);
-    return NextResponse.json(transfers);
+    // Метки «долг уже создан»: подтягиваем активные долги, привязанные к этим транзакциям.
+    const debts = await findDebtsByTxIds(transfers.map((t) => t.tx_id));
+    return NextResponse.json(transfers.map((t) => ({ ...t, debt: debts.get(t.tx_id) ?? null })));
   });
 }

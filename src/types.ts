@@ -49,6 +49,13 @@ export interface Trc20Transfer {
   symbol: string; // тикер токена (USDT)
   timestamp: number; // время блока, мс от эпохи
   direction: "in" | "out"; // относительно адреса кошелька
+  debt?: TransferDebtRef | null; // активный долг, заведённый по этой транзакции (заполняет роут)
+}
+
+// Ссылка на долг, привязанный к переводу (метка в попапе транзакций).
+export interface TransferDebtRef {
+  id: number;
+  manager_name: string | null;
 }
 
 export interface CheckBalancesResult {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ExternalLink, FilePlus, ChevronLeft } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ExternalLink, FileCheck, FilePlus, ChevronLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UsdtIcon } from "@/components/UsdtAmount";
@@ -150,19 +151,29 @@ function TransferRow({
         <ExternalLink className="size-4" />
       </a>
 
-      {out && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          onClick={onCreateDebt}
-          aria-label="Создать долг"
-        >
-          <FilePlus className="size-4" />
-          <span className="hidden sm:inline">Создать долг</span>
-        </Button>
-      )}
+      {out &&
+        (transfer.debt ? (
+          <Badge
+            variant="secondary"
+            className="max-w-32 shrink-0"
+            title="Долг по этой транзакции уже создан"
+          >
+            <FileCheck aria-hidden />
+            <span className="truncate">{transfer.debt.manager_name ?? "Долг"}</span>
+          </Badge>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={onCreateDebt}
+            aria-label="Создать долг"
+          >
+            <FilePlus className="size-4" />
+            <span className="hidden sm:inline">Создать долг</span>
+          </Button>
+        ))}
     </li>
   );
 }

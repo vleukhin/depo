@@ -17,6 +17,7 @@ import type {
   TrxSnapshot,
   DepoSnapshot,
   DepoSnapshotDetail,
+  TransferDebtRef,
 } from "@/types";
 import type {
   FundInput,
@@ -291,6 +292,25 @@ export async function listDeletedDebts(): Promise<Debt[]> {
     `${DEBT_SELECT_ARCHIVE} WHERE d.deleted_at IS NOT NULL ORDER BY d.deleted_at DESC, d.id DESC`,
   );
   return rs.rows.map(toDebt);
+}
+/** Активные долги, привязанные к транзакциям: tx_id -> ссылка на долг (для меток в попапе). */
+export async function findDebtsByTxIds(txIds: string[]): Promise<Map<string, TransferDebtRef>> {
+  if (txIds.length === 0) return new Map();
+  const db = await getClient();
+  const placeholders = txIds.map(() => "?").join(", ");
+  const rs = await db.execute({
+    sql:
+      "SELECT d.tx_id, d.id, m.name AS manager_name FROM debts d " +
+      "LEFT JOIN managers m ON m.id = d.manager_id " +
+      `WHERE d.deleted_at IS NULL AND d.tx_id IN (${placeholders})`,
+    args: txIds,
+  });
+  return new Map(
+    rs.rows.map((r) => [
+      String(r.tx_id),
+      { id: Number(r.id), manager_name: (r.manager_name as string | null) ?? null },
+    ]),
+  );
 }
 async function getDebt(id: number): Promise<Debt> {
   const db = await getClient();
