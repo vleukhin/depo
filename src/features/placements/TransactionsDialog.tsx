@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ExternalLink, FilePlus, ChevronLeft } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ExternalLink, FilePlus, ChevronLeft, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/ServiceIcon";
@@ -155,14 +155,28 @@ function TransferRow({
       {out &&
         (transfer.debt ? (
           <span
-            className="flex shrink-0 items-center gap-1.5"
-            title="Долг по этой транзакции уже создан"
+            className={
+              transfer.debt.deleted
+                ? "flex shrink-0 items-center gap-1.5 opacity-60"
+                : "flex shrink-0 items-center gap-1.5"
+            }
+            title={
+              transfer.debt.deleted
+                ? "Долг по этой транзакции был создан, но удалён (в архиве)"
+                : "Долг по этой транзакции уже создан"
+            }
           >
-            <Badge variant="secondary" className="max-w-32">
-              <span className="truncate">{transfer.debt.manager_name ?? "Долг"}</span>
+            <Badge
+              variant={transfer.debt.deleted ? "outline" : "secondary"}
+              className="max-w-32"
+            >
+              {transfer.debt.deleted && <Trash2 aria-hidden />}
+              <span className={transfer.debt.deleted ? "truncate line-through" : "truncate"}>
+                {transfer.debt.manager_name ?? "Долг"}
+              </span>
             </Badge>
             {transfer.debt.service && (
-              <Badge variant="secondary">
+              <Badge variant={transfer.debt.deleted ? "outline" : "secondary"}>
                 <ServiceIcon service={transfer.debt.service} className="size-3.5 rounded" />
                 {transfer.debt.service}
               </Badge>

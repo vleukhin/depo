@@ -57,6 +57,7 @@ export interface TransferDebtRef {
   id: number;
   manager_name: string | null;
   service: Service | null;
+  deleted: boolean; // долг мягко удалён (в архиве)
 }
 
 export interface CheckBalancesResult {
