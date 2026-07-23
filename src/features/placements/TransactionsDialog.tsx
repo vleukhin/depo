@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, ExternalLink, FileCheck, FilePlus, ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ServiceIcon } from "@/components/ServiceIcon";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UsdtIcon } from "@/components/UsdtAmount";
 import { DebtForm } from "@/features/debts/DebtForm";
@@ -155,11 +156,17 @@ function TransferRow({
         (transfer.debt ? (
           <Badge
             variant="secondary"
-            className="max-w-32 shrink-0"
+            className="max-w-48 shrink-0"
             title="Долг по этой транзакции уже создан"
           >
             <FileCheck aria-hidden />
             <span className="truncate">{transfer.debt.manager_name ?? "Долг"}</span>
+            {transfer.debt.service && (
+              <>
+                <ServiceIcon service={transfer.debt.service} className="size-3.5 rounded" />
+                {transfer.debt.service}
+              </>
+            )}
           </Badge>
         ) : (
           <Button

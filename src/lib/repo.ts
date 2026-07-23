@@ -300,7 +300,7 @@ export async function findDebtsByTxIds(txIds: string[]): Promise<Map<string, Tra
   const placeholders = txIds.map(() => "?").join(", ");
   const rs = await db.execute({
     sql:
-      "SELECT d.tx_id, d.id, m.name AS manager_name FROM debts d " +
+      "SELECT d.tx_id, d.id, d.service, m.name AS manager_name FROM debts d " +
       "LEFT JOIN managers m ON m.id = d.manager_id " +
       `WHERE d.deleted_at IS NULL AND d.tx_id IN (${placeholders})`,
     args: txIds,
@@ -308,7 +308,11 @@ export async function findDebtsByTxIds(txIds: string[]): Promise<Map<string, Tra
   return new Map(
     rs.rows.map((r) => [
       String(r.tx_id),
-      { id: Number(r.id), manager_name: (r.manager_name as string | null) ?? null },
+      {
+        id: Number(r.id),
+        manager_name: (r.manager_name as string | null) ?? null,
+        service: (r.service as Service | null) ?? null,
+      },
     ]),
   );
 }

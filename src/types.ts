@@ -56,6 +56,7 @@ export interface Trc20Transfer {
 export interface TransferDebtRef {
   id: number;
   manager_name: string | null;
+  service: Service | null;
 }
 
 export interface CheckBalancesResult {
