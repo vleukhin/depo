@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ExternalLink, FileCheck, FilePlus, ChevronLeft } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ExternalLink, FilePlus, ChevronLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/ServiceIcon";
@@ -154,20 +154,20 @@ function TransferRow({
 
       {out &&
         (transfer.debt ? (
-          <Badge
-            variant="secondary"
-            className="max-w-48 shrink-0"
+          <span
+            className="flex shrink-0 items-center gap-1.5"
             title="Долг по этой транзакции уже создан"
           >
-            <FileCheck aria-hidden />
-            <span className="truncate">{transfer.debt.manager_name ?? "Долг"}</span>
+            <Badge variant="secondary" className="max-w-32">
+              <span className="truncate">{transfer.debt.manager_name ?? "Долг"}</span>
+            </Badge>
             {transfer.debt.service && (
-              <>
+              <Badge variant="secondary">
                 <ServiceIcon service={transfer.debt.service} className="size-3.5 rounded" />
                 {transfer.debt.service}
-              </>
+              </Badge>
             )}
-          </Badge>
+          </span>
         ) : (
           <Button
             type="button"
