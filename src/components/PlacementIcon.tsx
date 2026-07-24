@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { PLACEMENT_ICONS, type PlacementIconId } from "@/types";
 
 // Настоящие логотипы брендов (официальные SVG-марки). Используются для пометки
-// размещения соответствующего сервиса. Каждая иконка — самодостаточный <svg>
+// записи соответствующего сервиса. Каждая иконка — самодостаточный <svg>
 // со своим viewBox; размер задаётся через className на компоненте PlacementIcon.
 
 const base = "inline-block shrink-0";
@@ -73,7 +73,7 @@ export const PLACEMENT_ICON_OPTIONS = PLACEMENT_ICONS.map((id) => ({
   label: PLACEMENT_ICON_META[id].label,
 }));
 
-/** Логотип бренда для размещения. Размер задаётся через className (напр. `size-5`). */
+/** Логотип бренда для записи. Размер задаётся через className (напр. `size-5`). */
 export function PlacementIcon({
   icon,
   className,

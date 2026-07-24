@@ -6,7 +6,7 @@ import { formatAmount } from "@/lib/format";
 import { useSummary } from "@/hooks/useSummary";
 import { useTrxPrice } from "@/hooks/useTrxPrice";
 
-/** Компаньон героя: суммарный TRX по всем размещениям и его оценка в $. Не входит в сверку. */
+/** Компаньон героя: суммарный TRX по всем записям свободных средств и его оценка в $. Не входит в сверку. */
 export function TrxHeroCard() {
   const { data: summary } = useSummary();
   const { data: trxPrice } = useTrxPrice();

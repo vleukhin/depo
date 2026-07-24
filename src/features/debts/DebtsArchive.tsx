@@ -17,7 +17,7 @@ import { formatDate, formatUsdt } from "@/lib/format";
 import { useDeletedDebts, useRestoreDebt } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
 
-// В архивной выборке имя источника приходит даже для удалённых размещений
+// В архивной выборке имя источника приходит даже для удалённых записей
 // (+ флаг placement_deleted_at, что источник сам в архиве).
 function SourceCell({ debt }: { debt: Debt }) {
   if (debt.placement_name) {

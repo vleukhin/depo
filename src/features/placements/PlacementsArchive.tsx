@@ -15,7 +15,7 @@ import { formatDate } from "@/lib/format";
 import { useDeletedPlacements, useRestorePlacement } from "@/hooks/usePlacements";
 import { ACCOUNT_LABELS } from "./PlacementForm";
 
-/** Архив размещений: только удалённые записи, их можно восстановить. */
+/** Архив свободных средств: только удалённые записи, их можно восстановить. */
 export function PlacementsArchive() {
   const { data: placements = [], isLoading } = useDeletedPlacements();
   const restore = useRestorePlacement();
@@ -23,7 +23,7 @@ export function PlacementsArchive() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Архив размещений</CardTitle>
+        <CardTitle>Архив свободных средств</CardTitle>
         <CardDescription>
           Удалённые записи: не входят в сверку и не проверяются балансами. Восстановленная запись
           вернётся в конец списка.

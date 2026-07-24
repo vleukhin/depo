@@ -41,7 +41,7 @@ export function SnapshotsList() {
                 <TableHead>Дата</TableHead>
                 <TableHead>Комментарий</TableHead>
                 <TableHead className="text-right">Депо</TableHead>
-                <TableHead className="text-right">Размещено</TableHead>
+                <TableHead className="text-right">Свободные</TableHead>
                 <TableHead className="text-right">Долги</TableHead>
                 <TableHead className="text-right">TRX</TableHead>
                 <TableHead>Сверка</TableHead>
@@ -126,7 +126,7 @@ export function SnapshotsList() {
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-2">
-                  <dt>Размещено</dt>
+                  <dt>Свободные</dt>
                   <dd>
                     <UsdtAmount value={s.total_placements} className="text-foreground" />
                   </dd>

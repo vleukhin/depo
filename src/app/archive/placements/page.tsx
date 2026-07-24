@@ -5,7 +5,7 @@ import { PlacementsArchive } from "@/features/placements/PlacementsArchive";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
-  title: "Архив размещений — Депо",
+  title: "Архив свободных средств — Депо",
 };
 
 export default function PlacementsArchivePage() {
@@ -22,7 +22,7 @@ export default function PlacementsArchivePage() {
           </Link>
           <ThemeToggle />
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight">Архив размещений</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Архив свободных средств</h1>
       </header>
 
       <PlacementsArchive />

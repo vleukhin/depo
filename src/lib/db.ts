@@ -55,7 +55,7 @@ async function migrate(db: Client) {
   await ensureColumn(db, "placements", "trx_amount", "INTEGER", { backfillFromId: false });
   await dropColumn(db, "placements", "chain_balance"); // колонка из ранней версии, сумма пишется в amount
   await dropColumn(db, "placements", "place"); // поле «место / платформа» убрано
-  // Размещение на бирже: существующие строки — внешние кошельки (kind = 'wallet').
+  // Хранение на бирже: существующие строки — внешние кошельки (kind = 'wallet').
   await ensureColumn(
     db,
     "placements",
@@ -77,7 +77,7 @@ async function migrate(db: Client) {
     "TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main'))",
     { backfillFromId: false },
   );
-  // Иконка размещения (выбирается вручную), NULL — без иконки.
+  // Иконка записи (выбирается вручную), NULL — без иконки.
   await ensureColumn(
     db,
     "placements",
@@ -196,7 +196,7 @@ CREATE TABLE IF NOT EXISTS debts (
   FOREIGN KEY (manager_id) REFERENCES managers(id) ON DELETE RESTRICT
 );
 
--- Ежедневные снимки суммарного TRX по всем размещениям. Сумма — SUN (micro-TRX).
+-- Ежедневные снимки суммарного TRX по всем записям. Сумма — SUN (micro-TRX).
 -- date — календарный день по МСК (UTC+3 без перехода на летнее время).
 CREATE TABLE IF NOT EXISTS trx_snapshots (
   date       TEXT PRIMARY KEY,
@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS trx_snapshots (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Снимки состояния депо: замороженная копия всех блоков (средства, размещения,
+-- Снимки состояния депо: замороженная копия всех блоков (средства, свободные средства,
 -- долги) на момент нажатия кнопки. Итоги — micro-USDT (total_trx — SUN), data —
 -- JSON с доменными объектами (десятичные суммы, как отдаёт API).
 CREATE TABLE IF NOT EXISTS depo_snapshots (

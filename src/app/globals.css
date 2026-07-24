@@ -87,7 +87,7 @@
   --ring: oklch(0.530 0.230 285);
 
   /* Chart ramp: violet → accent, also categorical for pie/donut */
-  --chart-1: oklch(0.550 0.220 285); /* violet (primary)  → размещено */
+  --chart-1: oklch(0.550 0.220 285); /* violet (primary)  → свободные средства */
   --chart-2: oklch(0.700 0.160 320); /* magenta-violet    → долги    */
   --chart-3: oklch(0.640 0.170 268); /* indigo            */
   --chart-4: oklch(0.720 0.140 250); /* periwinkle blue   */

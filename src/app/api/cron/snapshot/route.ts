@@ -9,7 +9,7 @@ import { handle } from "@/lib/api-helpers";
 import { checkAllBalances } from "@/lib/check-balances";
 
 export const runtime = "nodejs";
-// Обход всех размещений с паузами должен уложиться в лимит serverless-функции.
+// Обход всех записей с паузами должен уложиться в лимит serverless-функции.
 export const maxDuration = 60;
 
 /** Сверка Authorization с Bearer <CRON_SECRET> (timing-safe, как в telegram/route.ts). */

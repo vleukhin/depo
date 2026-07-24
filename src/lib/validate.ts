@@ -29,7 +29,7 @@ export const placementInput = z
     name: z.string().trim().min(1, "Укажите название").max(200),
     amount,
     kind: z
-      .enum(["wallet", "exchange"], { message: "Некорректный тип размещения" })
+      .enum(["wallet", "exchange"], { message: "Некорректный тип хранения" })
       .default("wallet"),
     address: optionalText,
     exchange: z
@@ -94,10 +94,10 @@ export const reorderInput = z.object({
 });
 
 // Ввод для вывода TRX с биржи на адрес кошелька. Адрес получателя сервер берёт
-// из сохранённого размещения по placementId — клиент шлёт только его id. Счёт-
+// из сохранённой записи по placementId — клиент шлёт только его id. Счёт-
 // источник фиксирован (spot), поэтому в схему не выносится.
 export const trxWithdrawInput = z.object({
-  placementId: z.number({ message: "Некорректное размещение" }).int().positive(),
+  placementId: z.number({ message: "Некорректная запись" }).int().positive(),
   exchange: z.enum(EXCHANGES, { message: "Некорректная биржа" }),
   amount: z.number({ message: "Укажите сумму" }).positive("Сумма должна быть больше нуля"),
 });

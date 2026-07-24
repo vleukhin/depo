@@ -182,7 +182,7 @@ export async function listPlacements(): Promise<Placement[]> {
   );
   return rs.rows.map(toPlacement);
 }
-/** Удалённые размещения — для страницы архива, свежеудалённые сверху. */
+/** Удалённые записи свободных средств — для страницы архива, свежеудалённые сверху. */
 export async function listDeletedPlacements(): Promise<Placement[]> {
   const db = await getClient();
   const rs = await db.execute(
@@ -267,7 +267,7 @@ export async function restorePlacement(id: number): Promise<Placement | null> {
 
 // ================= DEBTS =================
 const DEBT_FIELDS = "d.*, p.name AS placement_name, m.name AS manager_name";
-// Активные представления: имя источника скрыто, пока размещение в архиве (JOIN не матчится).
+// Активные представления: имя источника скрыто, пока запись в архиве (JOIN не матчится).
 const DEBT_SELECT =
   `SELECT ${DEBT_FIELDS} FROM debts d ` +
   "LEFT JOIN placements p ON p.id = d.placement_id AND p.deleted_at IS NULL " +
@@ -384,7 +384,7 @@ export async function restoreDebt(id: number): Promise<Debt | null> {
 }
 
 // ================= CHAIN / EXCHANGE BALANCE =================
-/** Строки размещений с адресами — кандидаты на проверку баланса в сети. */
+/** Строки свободных средств с адресами — кандидаты на проверку баланса в сети. */
 export async function listPlacementsWithAddress(): Promise<
   { id: number; name: string; address: string }[]
 > {
@@ -399,7 +399,7 @@ export async function listPlacementsWithAddress(): Promise<
   }));
 }
 
-/** Строки размещений на биржах — кандидаты на проверку баланса через API биржи. */
+/** Строки свободных средств на биржах — кандидаты на проверку баланса через API биржи. */
 export async function listExchangePlacements(): Promise<
   { id: number; name: string; exchange: Exchange; exchange_account: ExchangeAccount }[]
 > {
@@ -415,7 +415,7 @@ export async function listExchangePlacements(): Promise<
   }));
 }
 
-/** Перезаписывает балансы размещения (USDT в amount, TRX в trx_amount) из сети или с биржи. */
+/** Перезаписывает балансы записи (USDT в amount, TRX в trx_amount) из сети или с биржи. */
 export async function updateBalancesFromChain(
   id: number,
   usdtMicro: number,
@@ -457,7 +457,7 @@ export async function getSummary(): Promise<Summary> {
     );
     return Number(rs.rows[0].s);
   };
-  // Сверка в micro-единицах: размещено + долги против депо.
+  // Сверка в micro-единицах: свободные средства + долги против депо.
   // diff > 0 — избыток, diff < 0 — недостача. Архивные записи в сверку не входят.
   const funds = await one("funds");
   const placements = await one("placements", true);
@@ -483,7 +483,7 @@ const toTrxSnapshot = (r: Row): TrxSnapshot => ({
   trx_amount: fromMicro(Number(r.trx_amount)),
 });
 
-/** Апсертит снимок за сегодня (по МСК): сумма trx_amount активных размещений. */
+/** Апсертит снимок за сегодня (по МСК): сумма trx_amount активных записей. */
 export async function upsertTodayTrxSnapshot(): Promise<void> {
   const db = await getClient();
   await db.execute(

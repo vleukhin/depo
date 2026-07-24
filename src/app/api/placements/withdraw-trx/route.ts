@@ -9,7 +9,7 @@ import type { WithdrawTrxResult } from "@/types";
 export const runtime = "nodejs";
 
 // On-chain вывод TRX с биржи на адрес кошелька. Адрес получателя берём из
-// сохранённого размещения (клиент шлёт только placementId), проверяем его тип и
+// сохранённой записи (клиент шлёт только placementId), проверяем его тип и
 // валидность. Источник — спотовый счёт. Пока поддержана только Bitget.
 export function POST(request: Request) {
   return handle(async () => {
@@ -19,7 +19,7 @@ export function POST(request: Request) {
     if (!placement) notFound();
     if (placement.kind !== "wallet" || !placement.address || !isTronAddress(placement.address)) {
       throw NextResponse.json(
-        { error: "У размещения нет валидного TRON-адреса" },
+        { error: "У записи нет валидного TRON-адреса" },
         { status: 400 },
       );
     }

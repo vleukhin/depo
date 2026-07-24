@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-«Депо» — a single-user web app for tracking a USDT deposit: funds (средства), placements (размещение), debts (долги), and a dashboard that reconciles them (**размещено + долги = депо**). One Next.js 16 (App Router) process serves both the UI and the REST API under `/api/*`. All user-facing text, validation messages, API error messages, and most code comments are in Russian — keep it that way.
+«Депо» — a single-user web app for tracking a USDT deposit: funds (средства), placements (**«свободные средства»** in the UI — the code keeps the `placement` naming), debts (долги), and a dashboard that reconciles them (**свободные средства + долги = депо**). One Next.js 16 (App Router) process serves both the UI and the REST API under `/api/*`. All user-facing text, validation messages, API error messages, and most code comments are in Russian — keep it that way.
 
 ## Commands
 

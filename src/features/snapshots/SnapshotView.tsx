@@ -71,7 +71,7 @@ export function SnapshotView({ id }: { id: number }) {
             iconClassName="size-5"
           />
         </StatTile>
-        <StatTile label="Размещено">
+        <StatTile label="Свободные средства">
           <UsdtAmount
             value={snapshot.total_placements}
             className="text-2xl font-semibold tracking-tight"
@@ -131,7 +131,7 @@ export function SnapshotView({ id }: { id: number }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Размещения</CardTitle>
+          <CardTitle>Свободные средства</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

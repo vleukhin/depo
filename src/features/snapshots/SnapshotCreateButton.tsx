@@ -58,7 +58,7 @@ export function SnapshotCreateButton({ iconOnly = false }: { iconOnly?: boolean 
           <DialogHeader>
             <DialogTitle>Сделать снимок депо</DialogTitle>
             <DialogDescription>
-              Сохранит текущее состояние всех блоков: средства, размещения и долги. Снимок можно
+              Сохранит текущее состояние всех блоков: средства, свободные средства и долги. Снимок можно
               будет посмотреть на странице снимков.
             </DialogDescription>
           </DialogHeader>

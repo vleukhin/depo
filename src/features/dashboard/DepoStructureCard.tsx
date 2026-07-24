@@ -36,7 +36,7 @@ function StructureTooltip({
   );
 }
 
-/** Донат-диаграмма состава депо: размещено vs выдано в долг (их сумма сверяется с депо). */
+/** Донат-диаграмма состава депо: свободные средства vs выдано в долг (их сумма сверяется с депо). */
 export function DepoStructureCard() {
   const { data } = useSummary();
   const placed = data?.total_placements ?? 0;
@@ -45,7 +45,7 @@ export function DepoStructureCard() {
   const empty = total === 0;
 
   const segments: Segment[] = [
-    { name: "Размещено", value: placed, color: "var(--chart-1)" },
+    { name: "Свободные средства", value: placed, color: "var(--chart-1)" },
     { name: "Выдано в долг", value: debts, color: "var(--chart-2)" },
   ];
 

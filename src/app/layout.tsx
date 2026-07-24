@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Депо — учёт средств USDT",
-  description: "Учёт депозита USDT: средства, размещение, долги",
+  description: "Учёт депозита USDT: средства, свободные средства, долги",
 };
 
 export default function RootLayout({

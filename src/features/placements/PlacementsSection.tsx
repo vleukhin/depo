@@ -65,9 +65,9 @@ import { TrxTopUpDialog } from "./TrxTopUpDialog";
 import { TransactionsDialog } from "./TransactionsDialog";
 
 const DELETE_DESC =
-  "Размещение переместится в архив. Пока оно там, у связанных долгов источник не отображается. Восстановить можно на странице архива.";
+  "Запись переместится в архив. Пока она там, у связанных долгов источник не отображается. Восстановить можно на странице архива.";
 
-/** Короткое место размещения для компактной мобильной строки. */
+/** Короткое место хранения средств для компактной мобильной строки. */
 function placementLocation(p: Placement): string {
   if (p.kind === "exchange" && p.exchange && p.exchange_account) {
     return `${p.exchange} · ${ACCOUNT_LABELS[p.exchange_account]}`;
@@ -373,7 +373,7 @@ export function PlacementsSection() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? "Изменить размещение" : "Новое размещение"}</DialogTitle>
+            <DialogTitle>{editing ? "Изменить запись" : "Новая запись"}</DialogTitle>
           </DialogHeader>
           <PlacementForm placement={editing} onDone={() => setOpen(false)} />
         </DialogContent>

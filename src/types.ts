@@ -1,7 +1,7 @@
 export const SERVICES = ["Lets", "Mate", "N-Obmen", "Currex"] as const;
 export type Service = (typeof SERVICES)[number];
 
-// Размещение: внешний кошелёк или счёт на бирже.
+// Свободные средства: внешний кошелёк или счёт на бирже.
 export type PlacementKind = "wallet" | "exchange";
 
 export const EXCHANGES = ["KuCoin", "Bitget"] as const;
@@ -10,7 +10,7 @@ export type Exchange = (typeof EXCHANGES)[number];
 export const EXCHANGE_ACCOUNTS = ["spot", "main"] as const;
 export type ExchangeAccount = (typeof EXCHANGE_ACCOUNTS)[number];
 
-// Иконка размещения — выбирается вручную в настройках. null — без иконки.
+// Иконка записи — выбирается вручную в настройках. null — без иконки.
 export const PLACEMENT_ICONS = ["kucoin", "bitget", "onekey", "tangem"] as const;
 export type PlacementIconId = (typeof PLACEMENT_ICONS)[number];
 
@@ -31,7 +31,7 @@ export interface Placement {
   address: string | null; // только для kind = 'wallet'
   exchange: Exchange | null; // только для kind = 'exchange'
   exchange_account: ExchangeAccount | null; // тип счёта на бирже
-  icon: PlacementIconId | null; // иконка размещения (выбирается вручную), NULL — без иконки
+  icon: PlacementIconId | null; // иконка записи (выбирается вручную), NULL — без иконки
   comment: string | null;
   chain_checked_at: string | null; // когда сумма обновлялась из сети/с биржи, NULL — никогда
   trx_amount: number | null; // баланс нативного TRX (в TRX), NULL — не проверяли
@@ -104,7 +104,7 @@ export interface Debt {
   tx_id: string | null; // хэш ончейн-транзакции, если долг заведён из истории кошелька
   comment: string | null;
   deleted_at: string | null; // мягкое удаление: NULL — активен
-  placement_deleted_at: string | null; // источник-размещение в архиве (заполняется только в архивной выборке)
+  placement_deleted_at: string | null; // источник в архиве (заполняется только в архивной выборке)
   created_at: string;
   updated_at: string;
 }
@@ -113,8 +113,8 @@ export interface Summary {
   total_funds: number;
   total_placements: number;
   total_debts: number;
-  total_trx: number; // суммарный TRX по всем размещениям (информационно, вне сверки)
-  diff: number; // (размещено + долги) − депо: >0 избыток, <0 недостача
+  total_trx: number; // суммарный TRX по всем записям (информационно, вне сверки)
+  diff: number; // (свободные средства + долги) − депо: >0 избыток, <0 недостача
   balanced: boolean;
 }
 
@@ -126,7 +126,7 @@ export interface DepoSnapshot {
   total_placements: number;
   total_debts: number;
   total_trx: number; // суммарный TRX (информационно)
-  diff: number; // (размещено + долги) − депо на момент снимка
+  diff: number; // (свободные средства + долги) − депо на момент снимка
   balanced: boolean;
   created_at: string; // UTC-момент создания снимка
 }

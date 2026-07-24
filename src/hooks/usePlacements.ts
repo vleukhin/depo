@@ -22,7 +22,7 @@ export const {
   useReorder: useReorderPlacements,
 } = createResourceHooks<Placement, PlacementInput>("placements", "placements");
 
-/** Проверка балансов в сети TRON: сервер перезаписывает суммы размещений. */
+/** Проверка балансов в сети TRON: сервер перезаписывает суммы записей. */
 export function useCheckBalances() {
   const qc = useQueryClient();
   return useMutation({

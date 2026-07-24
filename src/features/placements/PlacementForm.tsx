@@ -87,7 +87,7 @@ export function PlacementForm({
     try {
       if (placement) await update.mutateAsync({ id: placement.id, input: values });
       else await create.mutateAsync(values);
-      toast.success(placement ? "Изменения сохранены" : "Размещение добавлено");
+      toast.success(placement ? "Изменения сохранены" : "Запись добавлена");
       onDone();
     } catch (e) {
       toast.error((e as Error).message);
@@ -118,7 +118,7 @@ export function PlacementForm({
         </div>
       </div>
       <div className="space-y-2">
-        <Label>Тип размещения</Label>
+        <Label>Где хранятся</Label>
         <Select
           value={kind}
           onValueChange={(v) => setValue("kind", v as PlacementKind)}
