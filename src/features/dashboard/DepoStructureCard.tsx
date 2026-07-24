@@ -53,7 +53,7 @@ export function DepoStructureCard() {
     <Card>
       <CardHeader>
         <CardTitle>Структура депо</CardTitle>
-        <CardDescription>Размещено и долги в составе депо</CardDescription>
+        <CardDescription>Свободные средства и долги в составе депо</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="relative h-64">
@@ -97,7 +97,6 @@ export function DepoStructureCard() {
               <span className="text-sm text-muted-foreground">Нет данных</span>
             ) : (
               <div className="text-center">
-                <p className="text-xs font-medium text-muted-foreground">Размещено + долги</p>
                 <UsdtAmount value={total} className="text-2xl font-semibold" />
               </div>
             )}

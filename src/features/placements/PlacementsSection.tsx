@@ -139,7 +139,7 @@ export function PlacementsSection() {
   return (
     <SectionCard
       id="placements"
-      title="Размещение"
+      title="Свободные средства"
       description="Где средства находятся сейчас"
       onAdd={openCreate}
       actions={
