@@ -37,6 +37,7 @@ export function TransactionsDialog({
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const tx = usePlacementTransactions(placement.id, open);
+  const transfers = tx.data?.pages.flatMap((p) => p.transfers) ?? [];
 
   function handleOpenChange(v: boolean) {
     if (!v) setDraft(null);
@@ -75,22 +76,35 @@ export function TransactionsDialog({
           />
         ) : tx.isLoading ? (
           <p className="py-6 text-center text-sm text-muted-foreground">Загрузка транзакций…</p>
-        ) : tx.isError ? (
+        ) : tx.isError && !tx.data ? (
           <p className="py-6 text-center text-sm text-destructive">{(tx.error as Error).message}</p>
-        ) : (tx.data?.length ?? 0) === 0 ? (
+        ) : transfers.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             Переводов USDT не найдено.
           </p>
         ) : (
-          <ul className="divide-y">
-            {tx.data!.map((t) => (
-              <TransferRow
-                key={t.tx_id}
-                transfer={t}
-                onCreateDebt={() => setDraft({ amount: t.amount, tx_id: t.tx_id })}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="-mr-2 max-h-[60vh] divide-y overflow-y-auto pr-2">
+              {transfers.map((t) => (
+                <TransferRow
+                  key={t.tx_id}
+                  transfer={t}
+                  onCreateDebt={() => setDraft({ amount: t.amount, tx_id: t.tx_id })}
+                />
+              ))}
+            </ul>
+            {tx.hasNextPage && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={tx.isFetchingNextPage}
+                onClick={() => tx.fetchNextPage()}
+              >
+                {tx.isFetchingNextPage ? "Загрузка…" : "Показать ещё"}
+              </Button>
+            )}
+          </>
         )}
       </DialogContent>
     </Dialog>
@@ -157,7 +171,7 @@ function TransferRow({
           <span
             className={
               transfer.debt.deleted
-                ? "flex shrink-0 items-center gap-1.5 opacity-60"
+                ? "flex shrink-0 items-center gap-1.5 opacity-40"
                 : "flex shrink-0 items-center gap-1.5"
             }
             title={

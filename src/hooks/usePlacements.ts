@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createResourceHooks } from "@/hooks/createResourceHooks";
 import { api } from "@/lib/api";
 import type {
@@ -7,7 +7,7 @@ import type {
   ExchangeAccount,
   ExchangeTrxInfo,
   Placement,
-  Trc20Transfer,
+  Trc20TransfersPage,
   WithdrawTrxResult,
 } from "@/types";
 import type { PlacementInput, TrxWithdrawInput } from "@/lib/validate";
@@ -51,11 +51,20 @@ export function useExchangeTrxInfo(exchange: Exchange, account: ExchangeAccount,
   });
 }
 
-/** Последние переводы USDT (TRC-20) по адресу кошелька — для попапа истории транзакций. */
+/**
+ * Переводы USDT (TRC-20) по адресу кошелька — для попапа истории транзакций.
+ * Постраничная подгрузка курсором TronGrid (fingerprint): «Показать ещё» в попапе.
+ */
 export function usePlacementTransactions(id: number, enabled: boolean) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ["placement-transactions", id],
-    queryFn: () => api.get<Trc20Transfer[]>(`/api/placements/${id}/transactions`),
+    queryFn: ({ pageParam }) =>
+      api.get<Trc20TransfersPage>(
+        `/api/placements/${id}/transactions` +
+          (pageParam ? `?fingerprint=${encodeURIComponent(pageParam)}` : ""),
+      ),
+    initialPageParam: "",
+    getNextPageParam: (last) => last.next ?? undefined,
     enabled,
     staleTime: 15_000,
     refetchOnWindowFocus: false,

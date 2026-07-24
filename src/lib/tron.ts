@@ -7,7 +7,7 @@
 // контракте и не зависят от активации аккаунта.
 
 import { createHash } from "node:crypto";
-import type { Trc20Transfer } from "@/types";
+import type { Trc20Transfer, Trc20TransfersPage } from "@/types";
 
 export const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
 const TRON_ADDRESS_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
@@ -131,6 +131,8 @@ interface Trc20TransferRow {
 interface Trc20TransfersResponse {
   data?: Trc20TransferRow[];
   success?: boolean;
+  // Курсор следующей страницы; на последней странице TronGrid его не отдаёт.
+  meta?: { fingerprint?: string };
 }
 
 /** Строка base-units + число знаков токена -> десятичное число (без потери точности на больших суммах). */
@@ -144,10 +146,15 @@ function transferValueToDecimal(value: string, decimals: number): number {
 }
 
 /**
- * Последние `limit` переводов USDT (TRC-20) по адресу через TronGrid REST v1.
+ * Страница переводов USDT (TRC-20) по адресу через TronGrid REST v1.
  * Фильтр по контракту USDT; только подтверждённые. На 429 — до 3 повторов с растущей паузой.
+ * `fingerprint` — курсор из предыдущей страницы (meta.fingerprint TronGrid).
  */
-export async function fetchUsdtTransfers(address: string, limit = 10): Promise<Trc20Transfer[]> {
+export async function fetchUsdtTransfers(
+  address: string,
+  limit = 10,
+  fingerprint?: string,
+): Promise<Trc20TransfersPage> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (process.env.TRONGRID_API_KEY) {
     headers["TRON-PRO-API-KEY"] = process.env.TRONGRID_API_KEY;
@@ -156,7 +163,8 @@ export async function fetchUsdtTransfers(address: string, limit = 10): Promise<T
   const addr = address.trim();
   const url =
     `https://api.trongrid.io/v1/accounts/${addr}/transactions/trc20` +
-    `?limit=${limit}&only_confirmed=true&contract_address=${USDT_CONTRACT}`;
+    `?limit=${limit}&only_confirmed=true&contract_address=${USDT_CONTRACT}` +
+    (fingerprint ? `&fingerprint=${encodeURIComponent(fingerprint)}` : "");
 
   let res: Response;
   let attempt = 0;
@@ -179,7 +187,7 @@ export async function fetchUsdtTransfers(address: string, limit = 10): Promise<T
   const rows = data.data ?? [];
   const lower = addr.toLowerCase();
 
-  return rows
+  const transfers = rows
     .filter((r) => r.transaction_id && r.value != null && r.from && r.to)
     .map((r) => {
       const decimals = r.token_info?.decimals ?? 6;
@@ -193,6 +201,8 @@ export async function fetchUsdtTransfers(address: string, limit = 10): Promise<T
         direction: (r.from as string).toLowerCase() === lower ? "out" : "in",
       } satisfies Trc20Transfer;
     });
+
+  return { transfers, next: data.meta?.fingerprint ?? null };
 }
 
 interface GetAccountResponse {

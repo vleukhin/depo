@@ -52,6 +52,12 @@ export interface Trc20Transfer {
   debt?: TransferDebtRef | null; // активный долг, заведённый по этой транзакции (заполняет роут)
 }
 
+// Страница переводов TRC-20 с курсором пагинации TronGrid.
+export interface Trc20TransfersPage {
+  transfers: Trc20Transfer[];
+  next: string | null; // fingerprint следующей страницы; null — переводов больше нет
+}
+
 // Ссылка на долг, привязанный к переводу (метка в попапе транзакций).
 export interface TransferDebtRef {
   id: number;
