@@ -109,6 +109,24 @@ export interface Debt {
   updated_at: string;
 }
 
+// Строка сводки по долгам: группа (менеджер или сервис) с суммой и числом записей.
+export interface DebtsSummaryRow {
+  name: string | null; // NULL — менеджер/сервис не указан
+  amount: number;
+  count: number;
+}
+
+// Сводка активных долгов за период [from, to] (обе даты включительно).
+export interface DebtsSummary {
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
+  total: number;
+  count: number;
+  by_manager: DebtsSummaryRow[];
+  by_service: DebtsSummaryRow[];
+  dates: string[]; // все даты с активными долгами — подсветка в календаре
+}
+
 export interface Summary {
   total_funds: number;
   total_placements: number;

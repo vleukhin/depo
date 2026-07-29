@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Archive, MoreHorizontal, Pencil, Trash2, Users } from "lucide-react";
+import { Archive, BarChart3, MoreHorizontal, Pencil, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,7 @@ import { TxLink } from "@/components/TxLink";
 import { useDebts, useDeleteDebt, useReorderDebts } from "@/hooks/useDebts";
 import type { Debt } from "@/types";
 import { DebtForm } from "./DebtForm";
+import { DebtsSummaryDialog } from "./DebtsSummaryDialog";
 import { ManagersDialog } from "@/features/managers/ManagersDialog";
 
 const DELETE_DESC = "Долг переместится в архив. Восстановить можно на странице архива.";
@@ -63,6 +64,7 @@ export function DebtsSection() {
   const reorder = useReorderDebts();
   const [open, setOpen] = useState(false);
   const [managersOpen, setManagersOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [editing, setEditing] = useState<Debt | undefined>(undefined);
   const [deleting, setDeleting] = useState<Debt | undefined>(undefined);
 
@@ -94,6 +96,15 @@ export function DebtsSection() {
       onAdd={openCreate}
       actions={
         <>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSummaryOpen(true)}
+            aria-label="Сводка"
+          >
+            <BarChart3 className="size-4" />
+            <span className="hidden md:inline">Сводка</span>
+          </Button>
           <Button size="sm" variant="outline" asChild aria-label="Архив">
             <Link href="/archive/debts">
               <Archive className="size-4" />
@@ -280,6 +291,7 @@ export function DebtsSection() {
       </AlertDialog>
 
       <ManagersDialog open={managersOpen} onOpenChange={setManagersOpen} />
+      <DebtsSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} />
     </SectionCard>
   );
 }

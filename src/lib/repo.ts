@@ -15,6 +15,8 @@ import type {
   TgDraft,
   TgDraftStatus,
   TrxSnapshot,
+  DebtsSummary,
+  DebtsSummaryRow,
   DepoSnapshot,
   DepoSnapshotDetail,
   TransferDebtRef,
@@ -381,6 +383,50 @@ export async function restoreDebt(id: number): Promise<Debt | null> {
   });
   if (rs.rowsAffected === 0) return null;
   return getDebt(id);
+}
+
+// ================= DEBTS SUMMARY =================
+const toSummaryRow = (r: Row): DebtsSummaryRow => ({
+  name: (r.name as string | null) ?? null,
+  amount: fromMicro(Number(r.amount)),
+  count: Number(r.count),
+});
+
+/** Сводка активных долгов за период [from, to]: суммы по менеджерам и по сервисам
+ * + все даты с активными долгами (для подсветки в календаре, без учёта периода). */
+export async function getDebtsSummary(from: string, to: string): Promise<DebtsSummary> {
+  const db = await getClient();
+  const byManager = await db.execute({
+    sql:
+      "SELECT m.name AS name, SUM(d.amount) AS amount, COUNT(*) AS count FROM debts d " +
+      "LEFT JOIN managers m ON m.id = d.manager_id " +
+      "WHERE d.deleted_at IS NULL AND d.date BETWEEN ? AND ? " +
+      "GROUP BY d.manager_id ORDER BY SUM(d.amount) DESC",
+    args: [from, to],
+  });
+  const byService = await db.execute({
+    sql:
+      "SELECT d.service AS name, SUM(d.amount) AS amount, COUNT(*) AS count FROM debts d " +
+      "WHERE d.deleted_at IS NULL AND d.date BETWEEN ? AND ? " +
+      "GROUP BY d.service ORDER BY SUM(d.amount) DESC",
+    args: [from, to],
+  });
+  const totals = await db.execute({
+    sql: "SELECT COALESCE(SUM(amount), 0) AS s, COUNT(*) AS c FROM debts WHERE deleted_at IS NULL AND date BETWEEN ? AND ?",
+    args: [from, to],
+  });
+  const dates = await db.execute(
+    "SELECT DISTINCT date FROM debts WHERE deleted_at IS NULL ORDER BY date ASC",
+  );
+  return {
+    from,
+    to,
+    total: fromMicro(Number(totals.rows[0].s)),
+    count: Number(totals.rows[0].c),
+    by_manager: byManager.rows.map(toSummaryRow),
+    by_service: byService.rows.map(toSummaryRow),
+    dates: dates.rows.map((r) => String(r.date)),
+  };
 }
 
 // ================= CHAIN / EXCHANGE BALANCE =================

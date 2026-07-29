@@ -11,6 +11,7 @@ export const {
   useRestore: useRestoreDebt,
   useReorder: useReorderDebts,
 } = createResourceHooks<Debt, DebtInput>("debts", "debts", {
-  // Создание/удаление долга меняет метки «долг уже создан» в попапе транзакций кошелька.
-  invalidateKeys: ["placement-transactions"],
+  // Создание/удаление долга меняет метки «долг уже создан» в попапе транзакций кошелька
+  // и содержимое сводки по долгам.
+  invalidateKeys: ["placement-transactions", "debts-summary"],
 });

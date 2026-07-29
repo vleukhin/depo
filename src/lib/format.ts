@@ -18,6 +18,18 @@ export function formatUsdtSigned(value: number): string {
   return `${sign}${usdtFormatter.format(Math.abs(value))}`;
 }
 
+/** "2026-07-12" -> Date в локальном поясе (без сдвига на UTC). */
+export function parseYmd(value: string): Date {
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Date -> "2026-07-12" в локальном поясе. */
+export function toYmd(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 const dateFormatter = new Intl.DateTimeFormat("ru-RU");
 
 /** "2026-07-12" или Date -> "12.07.2026" */

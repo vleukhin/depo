@@ -25,24 +25,12 @@ import {
 import { usePlacements } from "@/hooks/usePlacements";
 import { useManagers } from "@/hooks/useManagers";
 import { useCreateDebt, useUpdateDebt } from "@/hooks/useDebts";
-import { formatDate } from "@/lib/format";
+import { formatDate, parseYmd, toYmd } from "@/lib/format";
 import { SERVICES, type Debt, type Service } from "@/types";
 import type { DebtInput } from "@/lib/validate";
 
 const NONE = "__none__";
 const TEXT = "__text__";
-
-/** "2026-07-12" -> Date в локальном поясе (без сдвига на UTC). */
-function parseYmd(value: string): Date {
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-
-/** Date -> "2026-07-12" в локальном поясе. */
-function toYmd(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 // Валидируются только текстовые поля; менеджер, сервис и источник — через локальное состояние.
 const formSchema = z.object({
