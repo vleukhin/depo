@@ -13,7 +13,7 @@ import {
 import { DeleteButton } from "@/components/DeleteButton";
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { TrxAmount } from "@/components/TrxAmount";
-import { ReconciliationPill } from "@/features/dashboard/HeroCard";
+import { ReconciliationPill } from "@/components/ReconciliationPill";
 import { formatDateTime } from "@/lib/format";
 import { useDeleteSnapshot, useSnapshots } from "@/hooks/useSnapshots";
 

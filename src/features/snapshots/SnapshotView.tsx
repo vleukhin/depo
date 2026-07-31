@@ -14,7 +14,7 @@ import { UsdtAmount } from "@/components/UsdtAmount";
 import { TrxAmount } from "@/components/TrxAmount";
 import { Badge } from "@/components/ui/badge";
 import { ServiceIcon } from "@/components/ServiceIcon";
-import { ReconciliationPill } from "@/features/dashboard/HeroCard";
+import { ReconciliationPill } from "@/components/ReconciliationPill";
 import { ACCOUNT_LABELS } from "@/features/placements/PlacementForm";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useSnapshot } from "@/hooks/useSnapshots";
