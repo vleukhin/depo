@@ -329,7 +329,10 @@ async function getDebt(id: number): Promise<Debt> {
 export async function createDebt(input: DebtInput): Promise<Debt> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "INSERT INTO debts (manager_id, amount, date, service, placement_id, source_text, tx_id, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM debts))",
+    // Новый долг встаёт в начало видимого списка (сортировка sort_order ASC).
+    sql:
+      "INSERT INTO debts (manager_id, amount, date, service, placement_id, source_text, tx_id, comment, sort_order) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MIN(sort_order), 0) - 1 FROM debts WHERE deleted_at IS NULL))",
     args: [
       input.manager_id,
       toMicro(input.amount),
