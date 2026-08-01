@@ -36,7 +36,9 @@ export function SiteHeader() {
             Д
           </span>
           <span className="font-semibold tracking-tight">Депо</span>
-          {summary && <ReconciliationPill balanced={summary.balanced} diff={summary.diff} />}
+          {summary && (
+            <ReconciliationPill balanced={summary.balanced} diff={summary.diff} compact />
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <SnapshotCreateButton iconOnly />
