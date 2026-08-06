@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Archive,
+  BarChart3,
   Copy,
   History,
   MoreHorizontal,
@@ -63,6 +64,7 @@ import type { Placement } from "@/types";
 import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
 import { TrxTopUpDialog } from "./TrxTopUpDialog";
 import { TransactionsDialog } from "./TransactionsDialog";
+import { PlacementsSummaryDialog } from "./PlacementsSummaryDialog";
 
 const DELETE_DESC =
   "Запись переместится в архив. Пока она там, у связанных долгов источник не отображается. Восстановить можно на странице архива.";
@@ -96,6 +98,7 @@ export function PlacementsSection() {
   const [topUp, setTopUp] = useState<Placement | undefined>(undefined);
   const [txFor, setTxFor] = useState<Placement | undefined>(undefined);
   const [deleting, setDeleting] = useState<Placement | undefined>(undefined);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   function openCreate() {
     setEditing(undefined);
@@ -144,6 +147,15 @@ export function PlacementsSection() {
       onAdd={openCreate}
       actions={
         <>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSummaryOpen(true)}
+            aria-label="Сводка"
+          >
+            <BarChart3 className="size-4" />
+            <span className="hidden md:inline">Сводка</span>
+          </Button>
           <Button size="sm" variant="outline" asChild aria-label="Архив">
             <Link href="/archive/placements">
               <Archive className="size-4" />
@@ -412,6 +424,12 @@ export function PlacementsSection() {
           onOpenChange={(v) => !v && setTxFor(undefined)}
         />
       )}
+
+      <PlacementsSummaryDialog
+        open={summaryOpen}
+        onOpenChange={setSummaryOpen}
+        placements={placements}
+      />
     </SectionCard>
   );
 }
