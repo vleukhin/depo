@@ -1,0 +1,124 @@
+# Спецификация внешнего API «Депо» — той части, что открыта сторонним приложениям.
+# Внутренние эндпоинты UI (/api/funds, /api/placements, /api/debts и прочие) сюда
+# намеренно не входят: они закрыты сессионной cookie и меняются вместе с интерфейсом.
+# Версия 3.0.3 — для совместимости с генераторами клиентов.
+openapi: 3.0.3
+
+info:
+  title: Депо — внешний API
+  version: 1.0.0
+  description: |
+    Публичная часть API приложения «Депо» (учёт депозита в USDT) для сторонних
+    приложений.
+
+    Авторизация — токен в заголовке `Authorization: Bearer <EXTERNAL_API_TOKEN>`.
+    Токен задаётся переменной окружения `EXTERNAL_API_TOKEN` на сервере; если она
+    не задана, эндпоинты отвечают `401` на любой запрос.
+
+    Все суммы — в десятичных USDT (например `365000` или `1234.56`).
+
+servers:
+  - url: https://{host}
+    description: Продакшн-развёртывание
+    variables:
+      host:
+        default: depo.vercel.app
+        description: Домен вашего развёртывания (подставьте свой)
+  - url: http://localhost:3000
+    description: Локальная разработка (`npm run dev`)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Средства
+    description: Блок «Средства» — из чего состоит депо.
+
+paths:
+  /api/funds/balance:
+    get:
+      tags: [Средства]
+      summary: Баланс средства по названию
+      operationId: getFundBalance
+      description: |
+        Возвращает сумму средства с указанным названием.
+
+        Поиск идёт по **точному** названию и **с учётом регистра**; окружающие
+        пробелы в параметре обрезаются. Если средства с таким названием в депо нет,
+        ответ — `200` с `amount: 0` (а не `404`), чтобы клиенту не приходилось
+        различать «записи нет» и «баланс нулевой».
+
+        Если в депо несколько средств с одинаковым названием, возвращается сумма
+        их балансов.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          description: Название средства, как оно записано в блоке «Средства».
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          example: Бинанс
+      responses:
+        "200":
+          description: Баланс средства (0, если такого средства нет).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Balance"
+              examples:
+                found:
+                  summary: Средство найдено
+                  value: { amount: 365000 }
+                notFound:
+                  summary: Средства с таким названием нет
+                  value: { amount: 0 }
+        "400":
+          description: Параметр `name` не передан или пуст.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: { error: Укажите название }
+        "401":
+          description: Токен не передан, неверен либо не задан на сервере.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: { error: Требуется авторизация }
+        "500":
+          description: Внутренняя ошибка.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example: { error: Внутренняя ошибка }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Значение переменной окружения `EXTERNAL_API_TOKEN`, передаётся как
+        `Authorization: Bearer <токен>`.
+
+  schemas:
+    Balance:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: number
+          description: Баланс средства в десятичных USDT. 0 — средства с таким названием нет.
+          example: 365000
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Описание ошибки на русском.
+          example: Требуется авторизация

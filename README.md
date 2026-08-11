@@ -56,7 +56,14 @@ Vercel + Turso, бесплатно для личного использован�
 
 ## API
 
-REST под `/api`: `funds`, `managers`, `placements`, `debts` (CRUD: GET/POST/PUT/DELETE) и `summary` (GET, сводка со сверкой).
+REST под `/api`: `funds`, `managers`, `placements`, `debts` (CRUD: GET/POST/PUT/DELETE) и `summary` (GET, сводка со сверкой). Всё это закрыто сессионной cookie и предназначено для UI.
+
+**Внешний API** для сторонних приложений — `GET /api/funds/balance?name=<название>`: отдаёт `{ "amount": <USDT> }` для средства с таким названием (`0`, если такого средства нет). Авторизация — `Authorization: Bearer <EXTERNAL_API_TOKEN>` (переменная в `.env`; не задана — эндпоинт закрыт). Спецификация: [openapi.yaml](openapi.yaml).
+
+```bash
+curl -H "Authorization: Bearer $EXTERNAL_API_TOKEN" \
+  --get --data-urlencode 'name=Бинанс' https://<домен>/api/funds/balance
+```
 
 ## Структура
 
