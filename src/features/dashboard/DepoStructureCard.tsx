@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import {
   Card,
@@ -9,7 +10,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { UsdtAmount } from "@/components/UsdtAmount";
+import { useCollapsed } from "@/hooks/useCollapsed";
 import { useSummary } from "@/hooks/useSummary";
+import { cn } from "@/lib/utils";
 
 type Segment = { name: string; value: number; color: string };
 
@@ -38,6 +41,7 @@ function StructureTooltip({
 
 /** Донат-диаграмма состава депо: свободные средства vs выдано в долг (их сумма сверяется с депо). */
 export function DepoStructureCard() {
+  const [collapsed, toggle] = useCollapsed("depo-structure", true);
   const { data } = useSummary();
   const placed = data?.total_placements ?? 0;
   const debts = data?.total_debts ?? 0;
@@ -51,78 +55,90 @@ export function DepoStructureCard() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Структура депо</CardTitle>
-        <CardDescription>Свободные средства и долги в составе депо</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="relative h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              {!empty && (
-                <Tooltip
-                  content={<StructureTooltip />}
-                  cursor={false}
-                  wrapperStyle={{ outline: "none" }}
-                />
-              )}
-              <Pie
-                data={empty ? [{ name: "Нет данных", value: 1 }] : segments}
-                dataKey="value"
-                nameKey="name"
-                innerRadius="62%"
-                outerRadius="86%"
-                paddingAngle={empty ? 0 : 2}
-                cornerRadius={empty ? 0 : 6}
-                stroke="var(--card)"
-                strokeWidth={2}
-                startAngle={90}
-                endAngle={-270}
-                isAnimationActive={!empty}
-                animationDuration={600}
-                animationEasing="ease-out"
-              >
-                {empty ? (
-                  <Cell fill="var(--muted)" />
-                ) : (
-                  segments.map((s) => <Cell key={s.name} fill={s.color} />)
-                )}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
-
-          {/* Центральная подпись поверх отверстия доната. */}
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            {empty ? (
-              <span className="text-sm text-muted-foreground">Нет данных</span>
-            ) : (
-              <div className="text-center">
-                <UsdtAmount value={total} className="text-2xl font-semibold" />
-              </div>
+      <CardHeader className="cursor-pointer select-none" onClick={toggle}>
+        <CardTitle className="flex items-center gap-2">
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform",
+              collapsed && "-rotate-90",
             )}
-          </div>
-        </div>
+          />
+          Структура депо
+        </CardTitle>
+        <CardDescription className="pl-6">
+          Свободные средства и долги в составе депо
+        </CardDescription>
+      </CardHeader>
+      {!collapsed && (
+        <CardContent>
+          <div className="relative h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                {!empty && (
+                  <Tooltip
+                    content={<StructureTooltip />}
+                    cursor={false}
+                    wrapperStyle={{ outline: "none" }}
+                  />
+                )}
+                <Pie
+                  data={empty ? [{ name: "Нет данных", value: 1 }] : segments}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius="62%"
+                  outerRadius="86%"
+                  paddingAngle={empty ? 0 : 2}
+                  cornerRadius={empty ? 0 : 6}
+                  stroke="var(--card)"
+                  strokeWidth={2}
+                  startAngle={90}
+                  endAngle={-270}
+                  isAnimationActive={!empty}
+                  animationDuration={600}
+                  animationEasing="ease-out"
+                >
+                  {empty ? (
+                    <Cell fill="var(--muted)" />
+                  ) : (
+                    segments.map((s) => <Cell key={s.name} fill={s.color} />)
+                  )}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
 
-        {/* Легенда: точка + название + сумма + доля. */}
-        <ul className="mt-4 space-y-2">
-          {segments.map((s) => (
-            <li key={s.name} className="flex items-center gap-2 text-sm">
-              <span
-                className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: s.color }}
-                aria-hidden
-              />
-              <span className="text-muted-foreground">{s.name}</span>
-              <span className="ml-auto flex items-center gap-2 tabular-nums">
-                <UsdtAmount value={s.value} className="font-medium" />
-                <span className="text-xs text-muted-foreground">
-                  {pctFmt.format(total > 0 ? s.value / total : 0)}
+            {/* Центральная подпись поверх отверстия доната. */}
+            <div className="pointer-events-none absolute inset-0 grid place-items-center">
+              {empty ? (
+                <span className="text-sm text-muted-foreground">Нет данных</span>
+              ) : (
+                <div className="text-center">
+                  <UsdtAmount value={total} className="text-2xl font-semibold" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Легенда: точка + название + сумма + доля. */}
+          <ul className="mt-4 space-y-2">
+            {segments.map((s) => (
+              <li key={s.name} className="flex items-center gap-2 text-sm">
+                <span
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: s.color }}
+                  aria-hidden
+                />
+                <span className="text-muted-foreground">{s.name}</span>
+                <span className="ml-auto flex items-center gap-2 tabular-nums">
+                  <UsdtAmount value={s.value} className="font-medium" />
+                  <span className="text-xs text-muted-foreground">
+                    {pctFmt.format(total > 0 ? s.value / total : 0)}
+                  </span>
                 </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      )}
     </Card>
   );
 }
