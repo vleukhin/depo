@@ -83,6 +83,7 @@ git push origin master
    | `EXCHANGE_PROXY_URL` | опционально — прокси со статическим IP для бирж (см. «Статический IP…» ниже) |
    | `EXCHANGE_PROXY_CA` / `EXCHANGE_PROXY_SERVERNAME` | опционально — для HTTPS-прокси с самоподписанным сертификатом |
    | `CRON_SECRET` | случайная строка (`openssl rand -hex 32`) — авторизация ежедневного снимка TRX (см. «Ежедневный снимок TRX» ниже) |
+   | `EXTERNAL_API_TOKEN` | опционально — токен внешнего API `GET /api/funds/balance?name=…` (`Authorization: Bearer <токен>`). Не задан — эндпоинт закрыт |
 
    Значения берите из вашего локального `.env`. **Вводите их только в интерфейсе Vercel**
    (не коммитьте в репозиторий).

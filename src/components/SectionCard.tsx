@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,36 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useCollapsed } from "@/hooks/useCollapsed";
 import { cn } from "@/lib/utils";
-
-/** Схлопывание с сохранением в localStorage (useSyncExternalStore — без проблем с гидрацией). */
-const TOGGLE_EVENT = "depo-collapsed-change";
-
-function subscribe(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener(TOGGLE_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(TOGGLE_EVENT, callback);
-  };
-}
-
-function useCollapsed(id: string): [boolean, () => void] {
-  const storageKey = `depo:collapsed:${id}`;
-
-  const collapsed = useSyncExternalStore(
-    subscribe,
-    () => localStorage.getItem(storageKey) === "1",
-    () => false, // на сервере всегда развёрнуто
-  );
-
-  const toggle = useCallback(() => {
-    localStorage.setItem(storageKey, collapsed ? "0" : "1");
-    window.dispatchEvent(new Event(TOGGLE_EVENT));
-  }, [storageKey, collapsed]);
-
-  return [collapsed, toggle];
-}
 
 export function SectionCard({
   id,

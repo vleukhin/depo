@@ -31,6 +31,15 @@ export function verifySessionToken(token: string | undefined): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** Сверка заголовка Authorization с `Bearer <secret>` (постоянное время). */
+export function verifyBearerToken(header: string | null, secret: string | undefined): boolean {
+  if (!secret || !header) return false; // без секрета эндпоинт закрыт полностью
+  // Хэшируем обе стороны — timingSafeEqual требует буферы равной длины.
+  const a = createHash("sha256").update(header).digest();
+  const b = createHash("sha256").update(`Bearer ${secret}`).digest();
+  return timingSafeEqual(a, b);
+}
+
 export function verifyPassword(password: string): boolean {
   const expected = process.env.APP_PASSWORD ?? "";
   if (!expected) return false; // без APP_PASSWORD вход закрыт полностью

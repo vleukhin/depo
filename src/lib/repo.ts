@@ -88,6 +88,18 @@ export async function listFunds(): Promise<Fund[]> {
   const rs = await db.execute("SELECT * FROM funds ORDER BY id DESC");
   return rs.rows.map(toFund);
 }
+/**
+ * Баланс средства по точному названию (регистрозависимо). У `funds.name` нет UNIQUE,
+ * поэтому суммируем возможные одноимённые записи; SUM по пустой выборке даёт 0.
+ */
+export async function getFundAmountByName(name: string): Promise<number> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "SELECT COALESCE(SUM(amount), 0) AS s FROM funds WHERE name = ?",
+    args: [name],
+  });
+  return fromMicro(Number(rs.rows[0].s));
+}
 export async function createFund(input: FundInput): Promise<Fund> {
   const db = await getClient();
   const rs = await db.execute({
