@@ -65,6 +65,7 @@ import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
 import { TrxTopUpDialog } from "./TrxTopUpDialog";
 import { TransactionsDialog } from "./TransactionsDialog";
 import { PlacementsSummaryDialog } from "./PlacementsSummaryDialog";
+import { DayTransactionsDialog } from "./DayTransactionsDialog";
 
 const DELETE_DESC =
   "Запись переместится в архив. Пока она там, у связанных долгов источник не отображается. Восстановить можно на странице архива.";
@@ -99,6 +100,7 @@ export function PlacementsSection() {
   const [txFor, setTxFor] = useState<Placement | undefined>(undefined);
   const [deleting, setDeleting] = useState<Placement | undefined>(undefined);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [dayTxOpen, setDayTxOpen] = useState(false);
 
   function openCreate() {
     setEditing(undefined);
@@ -147,6 +149,15 @@ export function PlacementsSection() {
       onAdd={openCreate}
       actions={
         <>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDayTxOpen(true)}
+            aria-label="Транзакции"
+          >
+            <History className="size-4" />
+            <span className="hidden md:inline">Транзакции</span>
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -424,6 +435,8 @@ export function PlacementsSection() {
           onOpenChange={(v) => !v && setTxFor(undefined)}
         />
       )}
+
+      <DayTransactionsDialog open={dayTxOpen} onOpenChange={setDayTxOpen} />
 
       <PlacementsSummaryDialog
         open={summaryOpen}

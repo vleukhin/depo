@@ -15,7 +15,7 @@ export function GET(request: Request, ctx: RouteContext<"/api/placements/[id]/tr
       notFound();
     }
     const fingerprint = new URL(request.url).searchParams.get("fingerprint") ?? undefined;
-    const page = await fetchUsdtTransfers(placement.address, 10, fingerprint);
+    const page = await fetchUsdtTransfers(placement.address, { limit: 10, fingerprint });
     // Метки «долг уже создан»: подтягиваем активные долги, привязанные к этим транзакциям.
     const debts = await findDebtsByTxIds(page.transfers.map((t) => t.tx_id));
     return NextResponse.json({

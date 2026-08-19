@@ -66,6 +66,21 @@ export interface TransferDebtRef {
   deleted: boolean; // долг мягко удалён (в архиве)
 }
 
+// Перевод в дневной сводке по всем кошелькам: та же строка + кошелёк, к которому она относится.
+export interface WalletTransfer extends Trc20Transfer {
+  placement_id: number;
+  placement_name: string;
+  internal_with?: string | null; // название второго нашего кошелька (перевод между своими)
+}
+
+// Переводы USDT по всем внешним кошелькам за календарный день (МСК).
+export interface DayTransfers {
+  date: string; // YYYY-MM-DD по МСК
+  transfers: WalletTransfer[]; // все кошельки вперемешку, по времени убыв.
+  failed: { id: number; name: string; error: string }[]; // кошельки, по которым запрос упал
+  truncated: boolean; // уперлись в потолок страниц — показан не весь день
+}
+
 export interface CheckBalancesResult {
   checked: number;
   failed: { id: number; name: string; error: string }[];
