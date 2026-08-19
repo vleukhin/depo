@@ -1,28 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ExternalLink, FilePlus, ChevronLeft, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ServiceIcon } from "@/components/ServiceIcon";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { UsdtIcon } from "@/components/UsdtAmount";
 import { DebtForm } from "@/features/debts/DebtForm";
 import { usePlacementTransactions } from "@/hooks/usePlacements";
-import type { Placement, Trc20Transfer } from "@/types";
-
-// Точные суммы переводов (в отличие от целочисленных сумм в таблицах).
-const amountFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
-const timeFmt = new Intl.DateTimeFormat("ru-RU", {
-  day: "2-digit",
-  month: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-function shortAddress(value: string): string {
-  return value.length <= 14 ? value : `${value.slice(0, 6)}…${value.slice(-6)}`;
-}
+import type { Placement } from "@/types";
+import { TransferRow } from "./TransferRow";
 
 type Draft = { amount: number; tx_id: string };
 
@@ -108,107 +93,5 @@ export function TransactionsDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function TransferRow({
-  transfer,
-  onCreateDebt,
-}: {
-  transfer: Trc20Transfer;
-  onCreateDebt: () => void;
-}) {
-  const out = transfer.direction === "out";
-  const counterparty = out ? transfer.to : transfer.from;
-  return (
-    <li className="flex items-center gap-3 py-2.5">
-      <span
-        className={
-          out
-            ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive"
-            : "flex size-8 shrink-0 items-center justify-center rounded-full bg-success/10 text-success"
-        }
-        aria-label={out ? "Исходящий" : "Входящий"}
-      >
-        {out ? <ArrowUpRight className="size-4" /> : <ArrowDownLeft className="size-4" />}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1 font-medium tabular-nums">
-          {out ? "−" : "+"}
-          {amountFmt.format(transfer.amount)}
-          <UsdtIcon className="size-3.5 shrink-0" />
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span>{out ? "кому" : "от"}</span>
-          <a
-            href={`https://tronscan.org/#/address/${counterparty}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono hover:text-foreground hover:underline underline-offset-2"
-            title="Открыть адрес в Tronscan"
-          >
-            {shortAddress(counterparty)}
-          </a>
-          <span aria-hidden>·</span>
-          <span>{transfer.timestamp ? timeFmt.format(transfer.timestamp) : "—"}</span>
-        </div>
-      </div>
-
-      <a
-        href={`https://tronscan.org/#/transaction/${transfer.tx_id}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-muted-foreground hover:text-foreground"
-        title="Транзакция в Tronscan"
-        aria-label="Транзакция в Tronscan"
-      >
-        <ExternalLink className="size-4" />
-      </a>
-
-      {out &&
-        (transfer.debt ? (
-          <span
-            className={
-              transfer.debt.deleted
-                ? "flex shrink-0 items-center gap-1.5 opacity-40"
-                : "flex shrink-0 items-center gap-1.5"
-            }
-            title={
-              transfer.debt.deleted
-                ? "Долг по этой транзакции был создан, но удалён (в архиве)"
-                : "Долг по этой транзакции уже создан"
-            }
-          >
-            <Badge
-              variant={transfer.debt.deleted ? "outline" : "secondary"}
-              className="max-w-32"
-            >
-              {transfer.debt.deleted}
-              <span className={transfer.debt.deleted ? "truncate line-through" : "truncate"}>
-                {transfer.debt.manager_name ?? "Долг"}
-              </span>
-            </Badge>
-            {transfer.debt.service && (
-              <Badge variant={transfer.debt.deleted ? "outline" : "secondary"}>
-                <ServiceIcon service={transfer.debt.service} className="size-3.5 rounded" />
-                {transfer.debt.service}
-              </Badge>
-            )}
-          </span>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={onCreateDebt}
-            aria-label="Создать долг"
-          >
-            <FilePlus className="size-4" />
-            <span className="hidden sm:inline">Создать долг</span>
-          </Button>
-        ))}
-    </li>
   );
 }

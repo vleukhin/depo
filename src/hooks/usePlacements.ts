@@ -3,6 +3,7 @@ import { createResourceHooks } from "@/hooks/createResourceHooks";
 import { api } from "@/lib/api";
 import type {
   CheckBalancesResult,
+  DayTransfers,
   Exchange,
   ExchangeAccount,
   ExchangeTrxInfo,
@@ -65,6 +66,21 @@ export function usePlacementTransactions(id: number, enabled: boolean) {
       ),
     initialPageParam: "",
     getNextPageParam: (last) => last.next ?? undefined,
+    enabled,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+}
+
+/**
+ * Переводы USDT по всем внешним кошелькам за календарный день (МСК) —
+ * для попапа «Транзакции» в шапке блока. Страницы собирает сервер, тут обычный запрос.
+ */
+export function useDayTransactions(date: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["day-transactions", date],
+    queryFn: () => api.get<DayTransfers>(`/api/placements/transactions?date=${date}`),
     enabled,
     staleTime: 15_000,
     refetchOnWindowFocus: false,

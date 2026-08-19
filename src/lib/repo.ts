@@ -444,6 +444,23 @@ export async function getDebtsSummary(from: string, to: string): Promise<DebtsSu
   };
 }
 
+/** Внешние кошельки с адресом — источники переводов для дневной сводки транзакций. */
+export async function listWalletPlacementsWithAddress(): Promise<
+  { id: number; name: string; address: string }[]
+> {
+  const db = await getClient();
+  const rs = await db.execute(
+    "SELECT id, name, address FROM placements " +
+      "WHERE kind = 'wallet' AND address IS NOT NULL AND address != '' AND deleted_at IS NULL " +
+      "ORDER BY sort_order ASC, id ASC",
+  );
+  return rs.rows.map((r) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    address: String(r.address),
+  }));
+}
+
 // ================= CHAIN / EXCHANGE BALANCE =================
 /** Строки свободных средств с адресами — кандидаты на проверку баланса в сети. */
 export async function listPlacementsWithAddress(): Promise<

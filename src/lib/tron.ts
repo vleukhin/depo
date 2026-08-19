@@ -56,42 +56,28 @@ function tronAddressToHex20(address: string): string {
   return Buffer.from(payload.subarray(1)).toString("hex");
 }
 
-// --- запрос баланса ---
+// --- запросы к TronGrid ---
+
+const TRONGRID_BASE = "https://api.trongrid.io";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-interface TriggerConstantResponse {
-  result?: { result?: boolean; message?: string };
-  constant_result?: string[];
-}
-
 /**
- * Баланс USDT адреса в micro-единицах (у TRC-20 USDT 6 знаков — совпадает с нашим хранением).
- * Работает и для неактивированных адресов. На 429 — до 3 повторов с растущей паузой.
+ * Запрос к TronGrid: общие заголовки (с ключом, если он задан), таймаут 10с
+ * и до 3 повторов на 429 с растущей паузой. Бросает на любой не-2xx ответ.
  */
-export async function fetchUsdtBalance(address: string): Promise<number> {
+async function tronFetch<T>(path: string, init?: { method: "POST"; body: string }): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (process.env.TRONGRID_API_KEY) {
     headers["TRON-PRO-API-KEY"] = process.env.TRONGRID_API_KEY;
   }
 
-  // ABI-кодирование аргумента balanceOf: адрес, дополненный нулями до 32 байт.
-  const parameter = tronAddressToHex20(address).padStart(64, "0");
-  const body = JSON.stringify({
-    owner_address: address.trim(),
-    contract_address: USDT_CONTRACT,
-    function_selector: "balanceOf(address)",
-    parameter,
-    visible: true,
-  });
-
   let res: Response;
   let attempt = 0;
   for (;;) {
-    res = await fetch("https://api.trongrid.io/wallet/triggerconstantcontract", {
-      method: "POST",
+    res = await fetch(`${TRONGRID_BASE}${path}`, {
+      ...init,
       headers,
-      body,
       signal: AbortSignal.timeout(10_000),
       cache: "no-store",
     });
@@ -102,8 +88,32 @@ export async function fetchUsdtBalance(address: string): Promise<number> {
   if (!res.ok) {
     throw new Error(`TronGrid: HTTP ${res.status}`);
   }
+  return (await res.json()) as T;
+}
 
-  const data = (await res.json()) as TriggerConstantResponse;
+interface TriggerConstantResponse {
+  result?: { result?: boolean; message?: string };
+  constant_result?: string[];
+}
+
+/**
+ * Баланс USDT адреса в micro-единицах (у TRC-20 USDT 6 знаков — совпадает с нашим хранением).
+ * Работает и для неактивированных адресов.
+ */
+export async function fetchUsdtBalance(address: string): Promise<number> {
+  // ABI-кодирование аргумента balanceOf: адрес, дополненный нулями до 32 байт.
+  const parameter = tronAddressToHex20(address).padStart(64, "0");
+  const data = await tronFetch<TriggerConstantResponse>("/wallet/triggerconstantcontract", {
+    method: "POST",
+    body: JSON.stringify({
+      owner_address: address.trim(),
+      contract_address: USDT_CONTRACT,
+      function_selector: "balanceOf(address)",
+      parameter,
+      visible: true,
+    }),
+  });
+
   const hex = data.constant_result?.[0];
   if (!hex) {
     const message = data.result?.message
@@ -145,45 +155,36 @@ function transferValueToDecimal(value: string, decimals: number): number {
   return Number(whole) + Number(frac) / Number(divisor);
 }
 
+export interface Trc20TransfersQuery {
+  limit?: number; // 10 по умолчанию; потолок TronGrid — 200
+  fingerprint?: string; // курсор из meta.fingerprint предыдущей страницы
+  minTimestamp?: number; // мс от эпохи, включительно
+  maxTimestamp?: number;
+  orderBy?: "asc" | "desc"; // по времени блока; по умолчанию — как отдаёт TronGrid (убыв.)
+}
+
 /**
  * Страница переводов USDT (TRC-20) по адресу через TronGrid REST v1.
- * Фильтр по контракту USDT; только подтверждённые. На 429 — до 3 повторов с растущей паузой.
- * `fingerprint` — курсор из предыдущей страницы (meta.fingerprint TronGrid).
+ * Фильтр по контракту USDT; только подтверждённые.
  */
 export async function fetchUsdtTransfers(
   address: string,
-  limit = 10,
-  fingerprint?: string,
+  query: Trc20TransfersQuery = {},
 ): Promise<Trc20TransfersPage> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (process.env.TRONGRID_API_KEY) {
-    headers["TRON-PRO-API-KEY"] = process.env.TRONGRID_API_KEY;
-  }
-
   const addr = address.trim();
-  const url =
-    `https://api.trongrid.io/v1/accounts/${addr}/transactions/trc20` +
-    `?limit=${limit}&only_confirmed=true&contract_address=${USDT_CONTRACT}` +
-    (fingerprint ? `&fingerprint=${encodeURIComponent(fingerprint)}` : "");
+  const params = new URLSearchParams({
+    limit: String(query.limit ?? 10),
+    only_confirmed: "true",
+    contract_address: USDT_CONTRACT,
+  });
+  if (query.fingerprint) params.set("fingerprint", query.fingerprint);
+  if (query.minTimestamp !== undefined) params.set("min_timestamp", String(query.minTimestamp));
+  if (query.maxTimestamp !== undefined) params.set("max_timestamp", String(query.maxTimestamp));
+  if (query.orderBy) params.set("order_by", `block_timestamp,${query.orderBy}`);
 
-  let res: Response;
-  let attempt = 0;
-  for (;;) {
-    res = await fetch(url, {
-      method: "GET",
-      headers,
-      signal: AbortSignal.timeout(10_000),
-      cache: "no-store",
-    });
-    if (res.status !== 429 || attempt >= 3) break;
-    attempt++;
-    await sleep(1000 * attempt); // 1с, 2с, 3с
-  }
-  if (!res.ok) {
-    throw new Error(`TronGrid: HTTP ${res.status}`);
-  }
-
-  const data = (await res.json()) as Trc20TransfersResponse;
+  const data = await tronFetch<Trc20TransfersResponse>(
+    `/v1/accounts/${addr}/transactions/trc20?${params}`,
+  );
   const rows = data.data ?? [];
   const lower = addr.toLowerCase();
 
@@ -205,6 +206,37 @@ export async function fetchUsdtTransfers(
   return { transfers, next: data.meta?.fingerprint ?? null };
 }
 
+/**
+ * Все переводы USDT адреса за окно [from, to] (мс от эпохи, обе границы включительно).
+ * Идёт по курсору TronGrid до конца окна; `truncated` — упёрлись в потолок страниц
+ * (день с таким числом переводов нереален, потолок нужен от бесконечного цикла).
+ */
+export async function fetchUsdtTransfersInRange(
+  address: string,
+  from: number,
+  to: number,
+  opts: { pageLimit?: number; maxPages?: number } = {},
+): Promise<{ transfers: Trc20Transfer[]; truncated: boolean }> {
+  const pageLimit = opts.pageLimit ?? 200;
+  const maxPages = opts.maxPages ?? 3;
+
+  const transfers: Trc20Transfer[] = [];
+  let fingerprint: string | undefined;
+  for (let page = 0; page < maxPages; page++) {
+    const res = await fetchUsdtTransfers(address, {
+      limit: pageLimit,
+      minTimestamp: from,
+      maxTimestamp: to,
+      orderBy: "asc",
+      fingerprint,
+    });
+    transfers.push(...res.transfers);
+    if (!res.next) return { transfers, truncated: false };
+    fingerprint = res.next;
+  }
+  return { transfers, truncated: true };
+}
+
 interface GetAccountResponse {
   // Нативный баланс TRX в SUN. Для неактивированного аккаунта TronGrid
   // отдаёт пустой объект {}, поэтому поле необязательное.
@@ -219,36 +251,14 @@ interface GetAccountResponse {
  * В отличие от USDT нативный баланс читается из самого аккаунта
  * (POST /wallet/getaccount, поле `balance` в SUN), а не через контракт.
  * Для неактивированного/несуществующего адреса TronGrid возвращает пустой
- * объект {} без поля balance — это корректно означает 0 TRX. На 429 —
- * до 3 повторов с растущей паузой.
+ * объект {} без поля balance — это корректно означает 0 TRX.
  */
 export async function fetchTrxBalance(address: string): Promise<number> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (process.env.TRONGRID_API_KEY) {
-    headers["TRON-PRO-API-KEY"] = process.env.TRONGRID_API_KEY;
-  }
+  const data = await tronFetch<GetAccountResponse>("/wallet/getaccount", {
+    method: "POST",
+    body: JSON.stringify({ address: address.trim(), visible: true }),
+  });
 
-  const body = JSON.stringify({ address: address.trim(), visible: true });
-
-  let res: Response;
-  let attempt = 0;
-  for (;;) {
-    res = await fetch("https://api.trongrid.io/wallet/getaccount", {
-      method: "POST",
-      headers,
-      body,
-      signal: AbortSignal.timeout(10_000),
-      cache: "no-store",
-    });
-    if (res.status !== 429 || attempt >= 3) break;
-    attempt++;
-    await sleep(1000 * attempt); // 1с, 2с, 3с
-  }
-  if (!res.ok) {
-    throw new Error(`TronGrid: HTTP ${res.status}`);
-  }
-
-  const data = (await res.json()) as GetAccountResponse;
   // Неактивированный адрес -> пустой объект {} без balance -> 0 TRX.
   if (data.balance === undefined || data.balance === null) {
     return 0;

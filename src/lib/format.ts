@@ -30,6 +30,28 @@ export function toYmd(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+// Часовой пояс МСК фиксирован (UTC+3, без перехода на летнее время) — тот же день,
+// по которому считаются снимки TRX (date(datetime('now','+3 hours')) в БД).
+export const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/** "2026-07-12" -> границы суток по МСК в мс от эпохи (обе включительно). */
+export function mskDayRange(ymd: string): { from: number; to: number } {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const from = Date.UTC(y, m - 1, d) - MSK_OFFSET_MS;
+  return { from, to: from + 86_400_000 - 1 };
+}
+
+const mskTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Europe/Moscow",
+});
+
+/** Метка времени блока (мс от эпохи) -> "21:30" по МСК. */
+export function formatMskTime(ms: number): string {
+  return mskTimeFormatter.format(ms);
+}
+
 const dateFormatter = new Intl.DateTimeFormat("ru-RU");
 
 /** "2026-07-12" или Date -> "12.07.2026" */
