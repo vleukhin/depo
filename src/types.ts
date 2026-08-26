@@ -14,6 +14,35 @@ export type ExchangeAccount = (typeof EXCHANGE_ACCOUNTS)[number];
 export const PLACEMENT_ICONS = ["kucoin", "bitget", "onekey", "tangem"] as const;
 export type PlacementIconId = (typeof PLACEMENT_ICONS)[number];
 
+// Цвет тега — из фиксированной палитры (CSS-переменные --tag-* в globals.css).
+// Список дублируется в CHECK-констрейнте таблицы tags (lib/db.ts).
+export const TAG_COLORS = [
+  "violet",
+  "indigo",
+  "blue",
+  "teal",
+  "green",
+  "amber",
+  "orange",
+  "red",
+  "pink",
+  "slate",
+] as const;
+export type TagColor = (typeof TAG_COLORS)[number];
+
+export interface Tag {
+  id: number;
+  name: string;
+  color: TagColor;
+  created_at: string;
+  updated_at: string;
+}
+
+// Тег со счётчиком использования — в таком виде его отдают все эндпоинты /api/tags.
+export interface TagWithUsage extends Tag {
+  usage_count: number; // сколько активных записей помечено тегом
+}
+
 // Суммы во всех типах ниже — в десятичных USDT (micro-USDT остаётся внутри БД).
 export interface Fund {
   id: number;
@@ -35,6 +64,7 @@ export interface Placement {
   comment: string | null;
   chain_checked_at: string | null; // когда сумма обновлялась из сети/с биржи, NULL — никогда
   trx_amount: number | null; // баланс нативного TRX (в TRX), NULL — не проверяли
+  tags: Tag[]; // теги записи по алфавиту; заполняет репозиторий отдельным запросом
   deleted_at: string | null; // мягкое удаление: NULL — активно
   created_at: string;
   updated_at: string;

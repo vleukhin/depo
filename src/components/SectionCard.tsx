@@ -42,7 +42,9 @@ export function SectionCard({
           />
           {title}
         </CardTitle>
-        <CardDescription className="pl-6">{description}</CardDescription>
+        <CardDescription className="hidden pl-6 md:block">
+          {description}
+        </CardDescription>
         <CardAction
           className="flex items-center gap-2"
           onClick={(e) => e.stopPropagation()}

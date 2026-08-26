@@ -65,7 +65,7 @@ export function DepoStructureCard() {
           />
           Структура депо
         </CardTitle>
-        <CardDescription className="pl-6">
+        <CardDescription className="hidden pl-6 md:block">
           Свободные средства и долги в составе депо
         </CardDescription>
       </CardHeader>

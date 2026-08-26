@@ -247,4 +247,29 @@ CREATE TABLE IF NOT EXISTS tg_drafts (
   updated_at        TEXT    NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (manager_id) REFERENCES managers(id) ON DELETE SET NULL
 );
+
+-- Теги для записей «свободных средств»: название + цвет из фиксированной палитры
+-- (список должен совпадать с TAG_COLORS в src/types.ts).
+CREATE TABLE IF NOT EXISTS tags (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT    NOT NULL,
+  color      TEXT    NOT NULL DEFAULT 'violet' CHECK (color IN
+    ('violet','indigo','blue','teal','green','amber','orange','red','pink','slate')),
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Связь многие-ко-многим. CASCADE с обеих сторон: удаление тега снимает его со всех
+-- записей, а жёсткое удаление записи (в приложении используется мягкое) не оставляет
+-- висячих связей.
+CREATE TABLE IF NOT EXISTS placement_tags (
+  placement_id INTEGER NOT NULL,
+  tag_id       INTEGER NOT NULL,
+  PRIMARY KEY (placement_id, tag_id),
+  FOREIGN KEY (placement_id) REFERENCES placements(id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);
+
+-- Обратный поиск «записи по тегу»: PK покрывает только порядок (placement_id, tag_id).
+CREATE INDEX IF NOT EXISTS idx_placement_tags_tag ON placement_tags(tag_id);
 `;

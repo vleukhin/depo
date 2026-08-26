@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EXCHANGE_ACCOUNTS, EXCHANGES, PLACEMENT_ICONS, SERVICES } from "@/types";
+import { EXCHANGE_ACCOUNTS, EXCHANGES, PLACEMENT_ICONS, SERVICES, TAG_COLORS } from "@/types";
 
 // Суммы приходят с клиента в десятичных USDT (валидное число; форма шлёт number).
 const amount = z
@@ -24,6 +24,11 @@ export const managerInput = z.object({
   telegram: optionalText,
 });
 
+export const tagInput = z.object({
+  name: z.string().trim().min(1, "Укажите название").max(50),
+  color: z.enum(TAG_COLORS, { message: "Некорректный цвет" }).default("violet"),
+});
+
 export const placementInput = z
   .object({
     name: z.string().trim().min(1, "Укажите название").max(200),
@@ -45,6 +50,9 @@ export const placementInput = z
       .nullish()
       .transform((v) => v ?? null),
     comment: optionalText,
+    // Теги записи. Поле живёт внутри z.object(): схема заканчивается
+    // .superRefine().transform(), то есть .extend() к ней уже неприменим.
+    tag_ids: z.array(z.number().int().positive()).default([]),
   })
   .superRefine((v, ctx) => {
     if (v.kind === "exchange") {
@@ -118,6 +126,7 @@ export const parsedRequest = z.object({
 
 export type FundInput = z.infer<typeof fundInput>;
 export type ManagerInput = z.infer<typeof managerInput>;
+export type TagInput = z.infer<typeof tagInput>;
 export type PlacementInput = z.infer<typeof placementInput>;
 export type DebtInput = z.infer<typeof debtInput>;
 export type SnapshotInput = z.infer<typeof snapshotInput>;
@@ -127,4 +136,5 @@ export type ParsedRequestOutput = z.infer<typeof parsedRequest>;
 // input-типы для react-hook-form (до zod-трансформаций).
 export type FundFormValues = z.input<typeof fundInput>;
 export type ManagerFormValues = z.input<typeof managerInput>;
+export type TagFormValues = z.input<typeof tagInput>;
 export type PlacementFormValues = z.input<typeof placementInput>;

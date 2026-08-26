@@ -21,7 +21,10 @@ export const {
   useDelete: useDeletePlacement,
   useRestore: useRestorePlacement,
   useReorder: useReorderPlacements,
-} = createResourceHooks<Placement, PlacementInput>("placements", "placements");
+} = createResourceHooks<Placement, PlacementInput>("placements", "placements", {
+  // Смена тегов записи меняет usage_count на странице тегов.
+  invalidateKeys: ["tags"],
+});
 
 /** Проверка балансов в сети TRON: сервер перезаписывает суммы записей. */
 export function useCheckBalances() {

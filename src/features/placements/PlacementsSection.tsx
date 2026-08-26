@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Archive,
@@ -11,7 +11,9 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Tags,
   Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Table,
   TableBody,
   TableCell,
@@ -53,6 +60,7 @@ import { SortableCard, SortableRow, SortableRows } from "@/components/SortableRo
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { TrxAmount } from "@/components/TrxAmount";
 import { PlacementIcon } from "@/components/PlacementIcon";
+import { TagBadge, TagToggle } from "@/components/TagBadge";
 import { isTronAddress } from "@/lib/tron";
 import {
   useCheckBalances,
@@ -60,6 +68,7 @@ import {
   usePlacements,
   useReorderPlacements,
 } from "@/hooks/usePlacements";
+import { useTags } from "@/hooks/useTags";
 import type { Placement } from "@/types";
 import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
 import { TrxTopUpDialog } from "./TrxTopUpDialog";
@@ -94,6 +103,7 @@ export function PlacementsSection() {
   const del = useDeletePlacement();
   const reorder = useReorderPlacements();
   const check = useCheckBalances();
+  const { data: tags = [] } = useTags();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Placement | undefined>(undefined);
   const [topUp, setTopUp] = useState<Placement | undefined>(undefined);
@@ -101,6 +111,23 @@ export function PlacementsSection() {
   const [deleting, setDeleting] = useState<Placement | undefined>(undefined);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [dayTxOpen, setDayTxOpen] = useState(false);
+  const [filterTags, setFilterTags] = useState<number[]>([]);
+
+  // ИЛИ: запись подходит, если у неё есть хотя бы один из выбранных тегов.
+  const visible = useMemo(
+    () =>
+      filterTags.length === 0
+        ? placements
+        : placements.filter((p) => p.tags.some((t) => filterTags.includes(t.id))),
+    [placements, filterTags],
+  );
+  const filtering = filterTags.length > 0;
+
+  function toggleFilterTag(id: number) {
+    setFilterTags((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   function openCreate() {
     setEditing(undefined);
@@ -173,6 +200,55 @@ export function PlacementsSection() {
               <span className="hidden md:inline">Архив</span>
             </Link>
           </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant={filtering ? "default" : "outline"}
+                aria-label="Фильтр по тегам"
+              >
+                <Tags className="size-4" />
+                <span className="hidden md:inline">Теги</span>
+                {filtering && <span className="tabular-nums">{filterTags.length}</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 space-y-3">
+              {tags.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Тегов пока нет.</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.map((t) => (
+                      <TagToggle
+                        key={t.id}
+                        tag={t}
+                        selected={filterTags.includes(t.id)}
+                        onToggle={() => toggleFilterTag(t.id)}
+                      />
+                    ))}
+                  </div>
+                  {filtering && (
+                    <p className="text-xs text-muted-foreground">
+                      Пока фильтр активен, порядок записей не меняется.
+                    </p>
+                  )}
+                </>
+              )}
+              <div className="flex items-center justify-between gap-2 border-t pt-2">
+                <Link
+                  href="/tags"
+                  className="text-xs text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
+                >
+                  Управление тегами
+                </Link>
+                {filtering && (
+                  <Button size="sm" variant="ghost" onClick={() => setFilterTags([])}>
+                    Сбросить
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             size="sm"
             variant="outline"
@@ -188,16 +264,50 @@ export function PlacementsSection() {
         </>
       }
     >
+      {/* Состояние фильтра видно на всех разрешениях: на мобильном кнопка — одна иконка. */}
+      {filtering && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {tags
+            .filter((t) => filterTags.includes(t.id))
+            .map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => toggleFilterTag(t.id)}
+                aria-label={`Убрать из фильтра: ${t.name}`}
+                className="inline-flex items-center"
+              >
+                <TagBadge tag={t} className="gap-1 pr-1.5">
+                  <X className="size-3" />
+                </TagBadge>
+              </button>
+            ))}
+          <span className="text-xs text-muted-foreground">
+            Показано: {visible.length} из {placements.length}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs"
+            onClick={() => setFilterTags([])}
+          >
+            Сбросить
+          </Button>
+        </div>
+      )}
+
       <div className="hidden overflow-x-auto md:block">
         <SortableRows
-          ids={placements.map((p) => p.id)}
+          ids={visible.map((p) => p.id)}
           onReorder={(ids) => reorder.mutate(ids)}
+          disabled={filtering}
         >
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8" />
                 <TableHead>Название</TableHead>
+                <TableHead>Теги</TableHead>
                 <TableHead className="text-right">Сумма</TableHead>
                 <TableHead className="text-right">TRX</TableHead>
                 <TableHead>Адрес / счёт</TableHead>
@@ -206,13 +316,24 @@ export function PlacementsSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {placements.map((p) => (
-                <SortableRow key={p.id} id={p.id}>
+              {visible.map((p) => (
+                <SortableRow key={p.id} id={p.id} disabled={filtering}>
                   <TableCell className="font-medium">
                     <span className="inline-flex items-center gap-1.5">
                       {p.icon && <PlacementIcon icon={p.icon} className="size-3.5" />}
                       {p.name}
                     </span>
+                  </TableCell>
+                  <TableCell className="max-w-40">
+                    {p.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {p.tags.map((t) => (
+                          <TagBadge key={t.id} tag={t} />
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell
                     className="text-right"
@@ -297,10 +418,10 @@ export function PlacementsSection() {
                   </TableCell>
                 </SortableRow>
               ))}
-              {!isLoading && placements.length === 0 && (
+              {!isLoading && visible.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    Пока нет записей
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                    {filtering ? "Нет записей с выбранными тегами" : "Пока нет записей"}
                   </TableCell>
                 </TableRow>
               )}
@@ -311,12 +432,13 @@ export function PlacementsSection() {
 
       {/* Мобильный компактный список (2 строки на позицию): отдельный DndContext. */}
       <SortableRows
-        ids={placements.map((p) => p.id)}
+        ids={visible.map((p) => p.id)}
         onReorder={(ids) => reorder.mutate(ids)}
+        disabled={filtering}
       >
         <ul className="space-y-2 md:hidden">
-          {placements.map((p) => (
-            <SortableCard key={p.id} id={p.id}>
+          {visible.map((p) => (
+            <SortableCard key={p.id} id={p.id} disabled={filtering}>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -340,6 +462,15 @@ export function PlacementsSection() {
                       </span>
                     )}
                   </span>
+                  {/* Третья строка появляется только у помеченных записей,
+                      чтобы остальные карточки остались двухстрочными. */}
+                  {p.tags.length > 0 && (
+                    <span className="flex w-full flex-wrap gap-1">
+                      {p.tags.map((t) => (
+                        <TagBadge key={t.id} tag={t} size="sm" />
+                      ))}
+                    </span>
+                  )}
                 </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -385,9 +516,9 @@ export function PlacementsSection() {
               </div>
             </SortableCard>
           ))}
-          {!isLoading && placements.length === 0 && (
+          {!isLoading && visible.length === 0 && (
             <li className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card px-3 py-4 text-center text-sm text-muted-foreground">
-              Пока нет записей
+              {filtering ? "Нет записей с выбранными тегами" : "Пока нет записей"}
             </li>
           )}
         </ul>
