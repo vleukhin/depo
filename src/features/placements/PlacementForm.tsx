@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -22,6 +23,8 @@ import {
   type PlacementInput,
 } from "@/lib/validate";
 import { useCreatePlacement, useUpdatePlacement } from "@/hooks/usePlacements";
+import { useTags } from "@/hooks/useTags";
+import { TagToggle } from "@/components/TagBadge";
 import {
   EXCHANGE_ACCOUNTS,
   EXCHANGES,
@@ -56,6 +59,7 @@ export function PlacementForm({
 }) {
   const create = useCreatePlacement();
   const update = useUpdatePlacement();
+  const { data: tags = [] } = useTags();
   const {
     register,
     handleSubmit,
@@ -73,6 +77,7 @@ export function PlacementForm({
       exchange_account: placement?.exchange_account ?? null,
       icon: placement?.icon ?? null,
       comment: placement?.comment ?? "",
+      tag_ids: placement?.tags.map((t) => t.id) ?? [],
     },
   });
 
@@ -80,6 +85,7 @@ export function PlacementForm({
   const exchange = watch("exchange");
   const exchangeAccount = watch("exchange_account");
   const icon = watch("icon");
+  const tagIds = watch("tag_ids") ?? [];
 
   const submitting = create.isPending || update.isPending;
 
@@ -215,6 +221,42 @@ export function PlacementForm({
             ))}
           </SelectContent>
         </Select>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <Label>Теги</Label>
+          <Link
+            href="/tags"
+            className="text-xs text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
+          >
+            Управление тегами
+          </Link>
+        </div>
+        {/* Чипы прямо в форме, без Popover: список короткий, а вложенный попап
+            внутри Dialog хуже ведёт себя на телефоне. */}
+        {tags.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Тегов пока нет — создайте их на странице тегов.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map((t) => (
+              <TagToggle
+                key={t.id}
+                tag={t}
+                selected={tagIds.includes(t.id)}
+                onToggle={() =>
+                  setValue(
+                    "tag_ids",
+                    tagIds.includes(t.id)
+                      ? tagIds.filter((id) => id !== t.id)
+                      : [...tagIds, t.id],
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="p-comment">Комментарий</Label>

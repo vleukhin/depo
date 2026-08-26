@@ -4,6 +4,9 @@ import { fromMicro, toMicro } from "@/lib/money";
 import type {
   Fund,
   Manager,
+  Tag,
+  TagColor,
+  TagWithUsage,
   Placement,
   Debt,
   Summary,
@@ -24,6 +27,7 @@ import type {
 import type {
   FundInput,
   ManagerInput,
+  TagInput,
   PlacementInput,
   DebtInput,
   SnapshotInput,
@@ -51,6 +55,8 @@ const toPlacement = (r: Row): Placement => ({
   comment: (r.comment as string | null) ?? null,
   chain_checked_at: (r.chain_checked_at as string | null) ?? null,
   trx_amount: r.trx_amount === null ? null : fromMicro(Number(r.trx_amount)),
+  // Теги догружает withTags отдельным запросом — в строке placements их нет.
+  tags: [],
   deleted_at: (r.deleted_at as string | null) ?? null,
   created_at: String(r.created_at),
   updated_at: String(r.updated_at),
@@ -61,6 +67,19 @@ const toManager = (r: Row): Manager => ({
   telegram: (r.telegram as string | null) ?? null,
   created_at: String(r.created_at),
   updated_at: String(r.updated_at),
+});
+
+const toTag = (r: Row): Tag => ({
+  id: Number(r.id),
+  name: String(r.name),
+  color: r.color as TagColor,
+  created_at: String(r.created_at),
+  updated_at: String(r.updated_at),
+});
+// usage_count приходит только из TAG_SELECT (в тегах записи этой колонки нет).
+const toTagWithUsage = (r: Row): TagWithUsage => ({
+  ...toTag(r),
+  usage_count: Number(r.usage_count),
 });
 
 const toDebt = (r: Row): Debt => ({
@@ -188,13 +207,128 @@ export async function findManagerByTelegram(username: string): Promise<Manager |
   return rs.rows[0] ? toManager(rs.rows[0]) : null;
 }
 
+// ================= TAGS =================
+// Счётчик использования считает только активные записи (архивные не в счёт).
+const TAG_SELECT =
+  "SELECT t.*, (SELECT COUNT(*) FROM placement_tags pt JOIN placements p " +
+  "ON p.id = pt.placement_id AND p.deleted_at IS NULL WHERE pt.tag_id = t.id) AS usage_count FROM tags t";
+
+// SQLite (и libSQL) складывает регистр только для ASCII: COLLATE NOCASE и lower()
+// оставляют «Холодные» и «холодные» разными строками. Названия тегов русские,
+// поэтому и сравнение, и сортировка живут в JS.
+const byName = (a: Tag, b: Tag) => a.name.localeCompare(b.name, "ru");
+
+export async function listTags(): Promise<TagWithUsage[]> {
+  const db = await getClient();
+  const rs = await db.execute(TAG_SELECT);
+  return rs.rows.map(toTagWithUsage).sort(byName);
+}
+export async function getTag(id: number): Promise<TagWithUsage | null> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: `${TAG_SELECT} WHERE t.id = ?`, args: [id] });
+  return rs.rows[0] ? toTagWithUsage(rs.rows[0]) : null;
+}
+export async function createTag(input: TagInput): Promise<TagWithUsage> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "INSERT INTO tags (name, color) VALUES (?, ?)",
+    args: [input.name, input.color],
+  });
+  return (await getTag(Number(rs.lastInsertRowid)))!;
+}
+export async function updateTag(id: number, input: TagInput): Promise<TagWithUsage | null> {
+  const db = await getClient();
+  const rs = await db.execute({
+    sql: "UPDATE tags SET name = ?, color = ?, updated_at = datetime('now') WHERE id = ?",
+    args: [input.name, input.color, id],
+  });
+  if (rs.rowsAffected === 0) return null;
+  return getTag(id);
+}
+/** Жёсткое удаление: связи с записями снимает ON DELETE CASCADE. */
+export async function deleteTag(id: number): Promise<boolean> {
+  const db = await getClient();
+  const rs = await db.execute({ sql: "DELETE FROM tags WHERE id = ?", args: [id] });
+  return rs.rowsAffected > 0;
+}
+/** Занято ли название другим тегом (без учёта регистра, включая кириллицу). */
+export async function tagNameTaken(name: string, exceptId = 0): Promise<boolean> {
+  const db = await getClient();
+  const rs = await db.execute("SELECT id, name FROM tags");
+  const needle = name.toLocaleLowerCase("ru");
+  return rs.rows.some(
+    (r) => Number(r.id) !== exceptId && String(r.name).toLocaleLowerCase("ru") === needle,
+  );
+}
+
+/**
+ * id записи -> её теги (по алфавиту), одним запросом на весь список. Отдельным
+ * запросом, а не JOIN'ом с json_group_array: мапперы здесь намеренно перечисляют
+ * поля явно, а список записей заведомо мал.
+ */
+async function tagsByPlacement(ids: number[]): Promise<Map<number, Tag[]>> {
+  const byPlacement = new Map<number, Tag[]>();
+  if (ids.length === 0) return byPlacement;
+  const db = await getClient();
+  const rs = await db.execute({
+    sql:
+      "SELECT pt.placement_id, t.* FROM placement_tags pt JOIN tags t ON t.id = pt.tag_id " +
+      `WHERE pt.placement_id IN (${ids.map(() => "?").join(", ")})`,
+    args: ids,
+  });
+  for (const row of rs.rows) {
+    const key = Number(row.placement_id);
+    const list = byPlacement.get(key);
+    if (list) list.push(toTag(row));
+    else byPlacement.set(key, [toTag(row)]);
+  }
+  for (const list of byPlacement.values()) list.sort(byName);
+  return byPlacement;
+}
+
+/** Догружает теги к уже отмапленным записям. */
+async function withTags(placements: Placement[]): Promise<Placement[]> {
+  const byPlacement = await tagsByPlacement(placements.map((p) => p.id));
+  for (const p of placements) p.tags = byPlacement.get(p.id) ?? [];
+  return placements;
+}
+
+/**
+ * Переписывает набор тегов записи. Неизвестные id молча отбрасываются: иначе
+ * нарушение внешнего ключа всплыло бы англоязычной 500-й.
+ */
+async function setPlacementTags(placementId: number, tagIds: number[]): Promise<void> {
+  const db = await getClient();
+  const unique = [...new Set(tagIds)];
+  const known = new Set<number>();
+  if (unique.length > 0) {
+    const rs = await db.execute({
+      sql: `SELECT id FROM tags WHERE id IN (${unique.map(() => "?").join(", ")})`,
+      args: unique,
+    });
+    for (const row of rs.rows) known.add(Number(row.id));
+  }
+  await db.batch(
+    [
+      { sql: "DELETE FROM placement_tags WHERE placement_id = ?", args: [placementId] },
+      ...unique
+        .filter((id) => known.has(id))
+        .map((tagId) => ({
+          sql: "INSERT INTO placement_tags (placement_id, tag_id) VALUES (?, ?)",
+          args: [placementId, tagId],
+        })),
+    ],
+    "write",
+  );
+}
+
 // ================= PLACEMENTS =================
 export async function listPlacements(): Promise<Placement[]> {
   const db = await getClient();
   const rs = await db.execute(
     "SELECT * FROM placements WHERE deleted_at IS NULL ORDER BY sort_order ASC, id ASC",
   );
-  return rs.rows.map(toPlacement);
+  return withTags(rs.rows.map(toPlacement));
 }
 /** Удалённые записи свободных средств — для страницы архива, свежеудалённые сверху. */
 export async function listDeletedPlacements(): Promise<Placement[]> {
@@ -202,7 +336,7 @@ export async function listDeletedPlacements(): Promise<Placement[]> {
   const rs = await db.execute(
     "SELECT * FROM placements WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC, id DESC",
   );
-  return rs.rows.map(toPlacement);
+  return withTags(rs.rows.map(toPlacement));
 }
 export async function getPlacement(id: number): Promise<Placement | null> {
   const db = await getClient();
@@ -210,7 +344,8 @@ export async function getPlacement(id: number): Promise<Placement | null> {
     sql: "SELECT * FROM placements WHERE id = ? AND deleted_at IS NULL",
     args: [id],
   });
-  return rs.rows[0] ? toPlacement(rs.rows[0]) : null;
+  if (!rs.rows[0]) return null;
+  return (await withTags([toPlacement(rs.rows[0])]))[0];
 }
 export async function createPlacement(input: PlacementInput): Promise<Placement> {
   const db = await getClient();
@@ -227,11 +362,10 @@ export async function createPlacement(input: PlacementInput): Promise<Placement>
       input.comment,
     ],
   });
-  const row = await db.execute({
-    sql: "SELECT * FROM placements WHERE id = ?",
-    args: [Number(rs.lastInsertRowid)],
-  });
-  return toPlacement(row.rows[0]);
+  const id = Number(rs.lastInsertRowid);
+  await setPlacementTags(id, input.tag_ids);
+  const row = await db.execute({ sql: "SELECT * FROM placements WHERE id = ?", args: [id] });
+  return (await withTags([toPlacement(row.rows[0])]))[0];
 }
 export async function updatePlacement(
   id: number,
@@ -253,8 +387,9 @@ export async function updatePlacement(
     ],
   });
   if (rs.rowsAffected === 0) return null;
+  await setPlacementTags(id, input.tag_ids);
   const row = await db.execute({ sql: "SELECT * FROM placements WHERE id = ?", args: [id] });
-  return toPlacement(row.rows[0]);
+  return (await withTags([toPlacement(row.rows[0])]))[0];
 }
 /** Мягкое удаление: запись остаётся в БД и видна на странице архива. */
 export async function deletePlacement(id: number): Promise<boolean> {

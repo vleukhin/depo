@@ -20,14 +20,20 @@ import { GripVertical } from "lucide-react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-/** DnD-контекст для строк таблицы; onReorder получает полный новый порядок id. */
+/**
+ * DnD-контекст для строк таблицы; onReorder получает полный новый порядок id.
+ * disabled нужен, когда список отфильтрован: reorder переписывает sort_order
+ * позицией в массиве, так что перетаскивание подмножества испортило бы порядок.
+ */
 export function SortableRows({
   ids,
   onReorder,
+  disabled,
   children,
 }: {
   ids: number[];
   onReorder: (ids: number[]) => void;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   const sensors = useSensors(
@@ -35,7 +41,7 @@ export function SortableRows({
   );
 
   function handleDragEnd({ active, over }: DragEndEvent) {
-    if (!over || active.id === over.id) return;
+    if (disabled || !over || active.id === over.id) return;
     const from = ids.indexOf(Number(active.id));
     const to = ids.indexOf(Number(over.id));
     if (from !== -1 && to !== -1) onReorder(arrayMove(ids, from, to));
@@ -58,13 +64,15 @@ export function SortableRows({
 /** Строка таблицы с ручкой перетаскивания в первой ячейке. */
 export function SortableRow({
   id,
+  disabled,
   children,
 }: {
   id: number;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id });
+    useSortable({ id, disabled });
 
   return (
     <TableRow
@@ -73,12 +81,20 @@ export function SortableRow({
       className={cn(isDragging && "relative z-10 opacity-60 bg-muted")}
     >
       <TableCell className="w-8 pr-0">
+        {/* При disabled ручка остаётся на месте (колонки не съезжают), но не тянется. */}
         <button
           type="button"
           aria-label="Переместить"
-          className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground touch-none"
-          {...attributes}
-          {...listeners}
+          disabled={disabled}
+          title={disabled ? "Порядок не меняется, пока активен фильтр" : undefined}
+          className={cn(
+            "text-muted-foreground/60 touch-none",
+            disabled
+              ? "cursor-default opacity-40"
+              : "cursor-grab active:cursor-grabbing hover:text-muted-foreground",
+          )}
+          {...(disabled ? {} : attributes)}
+          {...(disabled ? {} : listeners)}
         >
           <GripVertical className="size-4" />
         </button>
@@ -94,15 +110,17 @@ export function SortableRow({
  */
 export function SortableCard({
   id,
+  disabled,
   children,
   className,
 }: {
   id: number;
+  disabled?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id });
+    useSortable({ id, disabled });
 
   return (
     <li
@@ -117,9 +135,15 @@ export function SortableCard({
       <button
         type="button"
         aria-label="Переместить"
-        className="flex w-7 shrink-0 items-center justify-center self-stretch rounded-md text-muted-foreground/50 hover:text-muted-foreground touch-none cursor-grab active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
+        disabled={disabled}
+        className={cn(
+          "flex w-7 shrink-0 items-center justify-center self-stretch rounded-md text-muted-foreground/50 touch-none",
+          disabled
+            ? "cursor-default opacity-40"
+            : "cursor-grab active:cursor-grabbing hover:text-muted-foreground",
+        )}
+        {...(disabled ? {} : attributes)}
+        {...(disabled ? {} : listeners)}
       >
         <GripVertical className="size-4" />
       </button>

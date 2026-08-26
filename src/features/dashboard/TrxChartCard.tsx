@@ -66,7 +66,9 @@ export function TrxChartCard() {
           />
           Динамика TRX
         </CardTitle>
-        <CardDescription className="pl-6">Суммарный TRX на конец дня</CardDescription>
+        <CardDescription className="hidden pl-6 md:block">
+          Суммарный TRX на конец дня
+        </CardDescription>
         {/* Переключатель периода нужен только в развёрнутой карточке; клик по нему не схлопывает её. */}
         {!collapsed && (
           <CardAction className="flex gap-1" onClick={(e) => e.stopPropagation()}>

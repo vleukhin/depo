@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { RestoreButton } from "@/components/RestoreButton";
 import { AddressCell } from "@/components/AddressCell";
+import { TagBadge } from "@/components/TagBadge";
 import { formatDate } from "@/lib/format";
 import { useDeletedPlacements, useRestorePlacement } from "@/hooks/usePlacements";
 import { ACCOUNT_LABELS } from "./PlacementForm";
@@ -44,7 +45,18 @@ export function PlacementsArchive() {
             <TableBody>
               {placements.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="flex flex-col gap-1">
+                      {p.name}
+                      {p.tags.length > 0 && (
+                        <span className="flex flex-wrap gap-1">
+                          {p.tags.map((t) => (
+                            <TagBadge key={t.id} tag={t} size="sm" />
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {p.kind === "exchange" && p.exchange && p.exchange_account ? (
                       <span className="font-sans">
@@ -86,8 +98,15 @@ export function PlacementsArchive() {
               key={p.id}
               className="rounded-lg ring-1 ring-foreground/10 bg-card shadow-card p-3"
             >
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-col gap-1">
                 <span className="font-medium">{p.name}</span>
+                {p.tags.length > 0 && (
+                  <span className="flex flex-wrap gap-1">
+                    {p.tags.map((t) => (
+                      <TagBadge key={t.id} tag={t} size="sm" />
+                    ))}
+                  </span>
+                )}
               </div>
               <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">
                 <div>

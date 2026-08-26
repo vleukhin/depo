@@ -93,6 +93,28 @@
   --chart-4: oklch(0.720 0.140 250); /* periwinkle blue   */
   --chart-5: oklch(0.750 0.120 200); /* teal accent       */
 
+  /* Tag palette — заливка + текст чипа. Пары держат контраст в своей теме. */
+  --tag-violet: oklch(0.930 0.051 285);
+  --tag-violet-fg: oklch(0.420 0.160 285);
+  --tag-indigo: oklch(0.930 0.048 268);
+  --tag-indigo-fg: oklch(0.420 0.150 268);
+  --tag-blue: oklch(0.930 0.045 250);
+  --tag-blue-fg: oklch(0.420 0.140 250);
+  --tag-teal: oklch(0.930 0.038 200);
+  --tag-teal-fg: oklch(0.420 0.120 200);
+  --tag-green: oklch(0.930 0.045 155);
+  --tag-green-fg: oklch(0.420 0.140 155);
+  --tag-amber: oklch(0.930 0.045 90);
+  --tag-amber-fg: oklch(0.420 0.140 90);
+  --tag-orange: oklch(0.930 0.048 55);
+  --tag-orange-fg: oklch(0.420 0.150 55);
+  --tag-red: oklch(0.930 0.058 27);
+  --tag-red-fg: oklch(0.420 0.180 27);
+  --tag-pink: oklch(0.930 0.048 350);
+  --tag-pink-fg: oklch(0.420 0.150 350);
+  --tag-slate: oklch(0.930 0.006 285);
+  --tag-slate-fg: oklch(0.420 0.020 285);
+
   --radius: 0.75rem;
 
   /* Sidebar (currently unused — kept in sync for completeness) */
@@ -147,6 +169,28 @@
   --chart-3: oklch(0.720 0.160 268);
   --chart-4: oklch(0.780 0.130 250);
   --chart-5: oklch(0.800 0.120 200);
+
+  /* Tag palette — заливка + текст чипа. Пары держат контраст в своей теме. */
+  --tag-violet: oklch(0.330 0.072 285);
+  --tag-violet-fg: oklch(0.830 0.112 285);
+  --tag-indigo: oklch(0.330 0.068 268);
+  --tag-indigo-fg: oklch(0.830 0.105 268);
+  --tag-blue: oklch(0.330 0.063 250);
+  --tag-blue-fg: oklch(0.830 0.098 250);
+  --tag-teal: oklch(0.330 0.054 200);
+  --tag-teal-fg: oklch(0.830 0.084 200);
+  --tag-green: oklch(0.330 0.063 155);
+  --tag-green-fg: oklch(0.830 0.098 155);
+  --tag-amber: oklch(0.330 0.063 90);
+  --tag-amber-fg: oklch(0.830 0.098 90);
+  --tag-orange: oklch(0.330 0.068 55);
+  --tag-orange-fg: oklch(0.830 0.105 55);
+  --tag-red: oklch(0.330 0.081 27);
+  --tag-red-fg: oklch(0.830 0.126 27);
+  --tag-pink: oklch(0.330 0.068 350);
+  --tag-pink-fg: oklch(0.830 0.105 350);
+  --tag-slate: oklch(0.330 0.009 285);
+  --tag-slate-fg: oklch(0.830 0.014 285);
 
   --sidebar: oklch(0.205 0.022 285);
   --sidebar-foreground: oklch(0.970 0.005 285);
