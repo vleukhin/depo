@@ -20,10 +20,10 @@ import { formatDate, formatDateTime } from "@/lib/format";
 import { useSnapshot } from "@/hooks/useSnapshots";
 import type { Debt } from "@/types";
 
-function sourceLabel(debt: Debt): string {
+function sourceLabel(debt: Debt): string | null {
   if (debt.placement_name) return debt.placement_name;
   if (debt.source_text) return debt.source_text;
-  return "—";
+  return null;
 }
 
 /** Итоговая плитка снимка: подпись + сумма. */
@@ -162,14 +162,10 @@ export function SnapshotView({ id }: { id: number }) {
                       <UsdtAmount value={p.amount} />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {p.trx_amount === null ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : (
-                        <TrxAmount value={p.trx_amount} />
-                      )}
+                      {p.trx_amount !== null && <TrxAmount value={p.trx_amount} />}
                     </TableCell>
                     <TableCell className="text-muted-foreground max-w-48 truncate">
-                      {p.comment ?? "—"}
+                      {p.comment}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -206,7 +202,7 @@ export function SnapshotView({ id }: { id: number }) {
               <TableBody>
                 {snapshot.debts.map((d) => (
                   <TableRow key={d.id}>
-                    <TableCell className="font-medium">{d.manager_name ?? "—"}</TableCell>
+                    <TableCell className="font-medium">{d.manager_name}</TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
                       {formatDate(d.date)}
                     </TableCell>
@@ -214,18 +210,16 @@ export function SnapshotView({ id }: { id: number }) {
                       <UsdtAmount value={d.amount} />
                     </TableCell>
                     <TableCell>
-                      {d.service ? (
+                      {d.service && (
                         <Badge variant="secondary" className="gap-1.5 pl-1">
                           <ServiceIcon service={d.service} className="size-4" />
                           {d.service}
                         </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{sourceLabel(d)}</TableCell>
                     <TableCell className="text-muted-foreground max-w-48 truncate">
-                      {d.comment ?? "—"}
+                      {d.comment}
                     </TableCell>
                   </TableRow>
                 ))}

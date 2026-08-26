@@ -362,9 +362,7 @@ export function PlacementsSection() {
                           ))}
                         </div>
                       )
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                    ) : null}
                   </TableCell>
                   <TableCell
                     className="text-right"
@@ -385,7 +383,7 @@ export function PlacementsSection() {
                     }
                   >
                     <span className="inline-flex items-center justify-end gap-1">
-                      {p.trx_amount != null ? <TrxAmount value={p.trx_amount} /> : "—"}
+                      {p.trx_amount != null && <TrxAmount value={p.trx_amount} />}
                       {p.kind === "wallet" && isTronAddress(p.address) ? (
                         <Button
                           variant="ghost"
@@ -417,7 +415,7 @@ export function PlacementsSection() {
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
-                    {p.comment ?? "—"}
+                    {p.comment}
                   </TableCell>
                   <TableCell className="text-right">
                     {p.kind === "wallet" && isTronAddress(p.address) && (

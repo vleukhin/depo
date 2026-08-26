@@ -60,7 +60,7 @@ export function SnapshotsList() {
                     </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-64 truncate">
-                    {s.comment ?? "—"}
+                    {s.comment}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     <UsdtAmount value={s.total_funds} />

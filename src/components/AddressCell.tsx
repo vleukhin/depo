@@ -19,7 +19,7 @@ function AddressText({ value }: { value: string }) {
 
 /** Адрес записи: ссылка в Tronscan (для TRON-адресов) + кнопка копирования. */
 export function AddressCell({ address }: { address: string | null }) {
-  if (!address) return <span className="text-muted-foreground">—</span>;
+  if (!address) return null;
   return (
     <span className="inline-flex items-center gap-1">
       {isTronAddress(address) ? (

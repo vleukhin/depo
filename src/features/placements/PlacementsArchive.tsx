@@ -67,13 +67,13 @@ export function PlacementsArchive() {
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
-                    {p.comment ?? "—"}
+                    {p.comment}
                   </TableCell>
                   <TableCell
                     className="text-muted-foreground whitespace-nowrap tabular-nums"
                     title={p.deleted_at ? `${p.deleted_at} UTC` : undefined}
                   >
-                    {p.deleted_at ? formatDate(p.deleted_at.slice(0, 10)) : "—"}
+                    {p.deleted_at ? formatDate(p.deleted_at.slice(0, 10)) : null}
                   </TableCell>
                   <TableCell className="text-right">
                     <RestoreButton onConfirm={() => restore.mutateAsync(p.id)} />

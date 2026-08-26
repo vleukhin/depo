@@ -141,7 +141,7 @@ export function DebtsSection() {
             <TableBody>
               {debts.map((debt) => (
                 <SortableRow key={debt.id} id={debt.id}>
-                  <TableCell className="font-medium">{debt.manager_name ?? "—"}</TableCell>
+                  <TableCell className="font-medium">{debt.manager_name}</TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
                     {formatDate(debt.date)}
                   </TableCell>
@@ -149,23 +149,21 @@ export function DebtsSection() {
                     <UsdtAmount value={debt.amount} />
                   </TableCell>
                   <TableCell>
-                    {debt.service ? (
+                    {debt.service && (
                       <Badge variant="secondary" className="gap-1.5 pl-1">
                         <ServiceIcon service={debt.service} className="size-4" />
                         {debt.service}
                       </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
-                      {sourceLabel(debt)}
+                      {debt.placement_name ?? debt.source_text}
                       <TxLink txId={debt.tx_id} />
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
-                    {debt.comment ?? "—"}
+                    {debt.comment}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

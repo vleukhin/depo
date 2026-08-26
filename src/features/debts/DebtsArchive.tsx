@@ -30,7 +30,7 @@ function SourceCell({ debt }: { debt: Debt }) {
       </span>
     );
   }
-  return <span>{debt.source_text ?? "—"}</span>;
+  return debt.source_text ? <span>{debt.source_text}</span> : null;
 }
 
 /** Архив долгов: только удалённые записи, их можно восстановить. */
@@ -64,7 +64,7 @@ export function DebtsArchive() {
             <TableBody>
               {debts.map((debt) => (
                 <TableRow key={debt.id}>
-                  <TableCell className="font-medium">{debt.manager_name ?? "—"}</TableCell>
+                  <TableCell className="font-medium">{debt.manager_name}</TableCell>
                   <TableCell className="text-muted-foreground whitespace-nowrap tabular-nums">
                     {formatDate(debt.date)}
                   </TableCell>
@@ -72,13 +72,11 @@ export function DebtsArchive() {
                     {formatUsdt(debt.amount)}
                   </TableCell>
                   <TableCell>
-                    {debt.service ? (
+                    {debt.service && (
                       <Badge variant="secondary" className="gap-1.5 pl-1">
                         <ServiceIcon service={debt.service} className="size-4" />
                         {debt.service}
                       </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -88,13 +86,13 @@ export function DebtsArchive() {
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
-                    {debt.comment ?? "—"}
+                    {debt.comment}
                   </TableCell>
                   <TableCell
                     className="text-muted-foreground whitespace-nowrap tabular-nums"
                     title={debt.deleted_at ? `${debt.deleted_at} UTC` : undefined}
                   >
-                    {debt.deleted_at ? formatDate(debt.deleted_at.slice(0, 10)) : "—"}
+                    {debt.deleted_at ? formatDate(debt.deleted_at.slice(0, 10)) : null}
                   </TableCell>
                   <TableCell className="text-right">
                     <RestoreButton onConfirm={() => restore.mutateAsync(debt.id)} />

@@ -29,7 +29,7 @@ function telegramUrl(nick: string): string {
 }
 
 function TelegramCell({ telegram }: { telegram: string | null }) {
-  if (!telegram) return <span className="text-muted-foreground">—</span>;
+  if (!telegram) return null;
   const handle = telegram.trim().replace(/^@/, "");
   return (
     <a
