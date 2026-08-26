@@ -115,7 +115,7 @@ export function PlacementForm({
           <Input
             id="p-amount"
             type="number"
-            step="1"
+            step="0.000001"
             min="0"
             placeholder="0"
             {...register("amount", { valueAsNumber: true })}
