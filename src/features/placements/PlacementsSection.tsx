@@ -60,8 +60,9 @@ import { SortableCard, SortableRow, SortableRows } from "@/components/SortableRo
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { TrxAmount } from "@/components/TrxAmount";
 import { PlacementIcon } from "@/components/PlacementIcon";
-import { TagBadge, TagToggle } from "@/components/TagBadge";
+import { CompactTagList, TagBadge, TagToggle } from "@/components/TagBadge";
 import { isTronAddress } from "@/lib/tron";
+import { cn } from "@/lib/utils";
 import {
   useCheckBalances,
   useDeletePlacement,
@@ -69,6 +70,7 @@ import {
   useReorderPlacements,
 } from "@/hooks/usePlacements";
 import { useTags } from "@/hooks/useTags";
+import { useStoredBoolean } from "@/hooks/useStoredBoolean";
 import type { Placement } from "@/types";
 import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
 import { TrxTopUpDialog } from "./TrxTopUpDialog";
@@ -112,6 +114,9 @@ export function PlacementsSection() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [dayTxOpen, setDayTxOpen] = useState(false);
   const [filterTags, setFilterTags] = useState<number[]>([]);
+  const [compactTags, toggleCompactTags] = useStoredBoolean(
+    "depo:placements:compact-tags",
+  );
 
   // ИЛИ: запись подходит, если у неё есть хотя бы один из выбранных тегов.
   const visible = useMemo(
@@ -213,6 +218,28 @@ export function PlacementsSection() {
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-64 space-y-3">
+              <div className="flex items-center justify-between gap-3 border-b pb-3">
+                <span className="text-sm">Компактный вид</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={compactTags}
+                  aria-label="Компактный вид тегов"
+                  onClick={toggleCompactTags}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    compactTags ? "bg-primary" : "bg-input",
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "size-4 rounded-full bg-background shadow-sm transition-transform",
+                      compactTags && "translate-x-4",
+                    )}
+                  />
+                </button>
+              </div>
               {tags.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Тегов пока нет.</p>
               ) : (
@@ -326,11 +353,15 @@ export function PlacementsSection() {
                   </TableCell>
                   <TableCell className="max-w-40">
                     {p.tags.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {p.tags.map((t) => (
-                          <TagBadge key={t.id} tag={t} />
-                        ))}
-                      </div>
+                      compactTags ? (
+                        <CompactTagList tags={p.tags} />
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {p.tags.map((t) => (
+                            <TagBadge key={t.id} tag={t} />
+                          ))}
+                        </div>
+                      )
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
@@ -465,10 +496,12 @@ export function PlacementsSection() {
                   {/* Третья строка появляется только у помеченных записей,
                       чтобы остальные карточки остались двухстрочными. */}
                   {p.tags.length > 0 && (
-                    <span className="flex w-full flex-wrap gap-1">
-                      {p.tags.map((t) => (
-                        <TagBadge key={t.id} tag={t} size="sm" />
-                      ))}
+                    <span className="flex w-full items-center gap-1">
+                      {compactTags ? (
+                        <CompactTagList tags={p.tags} />
+                      ) : (
+                        p.tags.map((t) => <TagBadge key={t.id} tag={t} size="sm" />)
+                      )}
                     </span>
                   )}
                 </button>

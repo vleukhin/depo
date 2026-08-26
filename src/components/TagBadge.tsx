@@ -1,5 +1,11 @@
 import { Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { TAG_COLORS, type Tag, type TagColor } from "@/types";
 
@@ -31,6 +37,19 @@ const TAG_DOT_CLASS: Record<TagColor, string> = {
   slate: "bg-[var(--tag-slate-fg)]",
 };
 
+const TAG_TOOLTIP_ARROW_CLASS: Record<TagColor, string> = {
+  violet: "fill-[var(--tag-violet)]",
+  indigo: "fill-[var(--tag-indigo)]",
+  blue: "fill-[var(--tag-blue)]",
+  teal: "fill-[var(--tag-teal)]",
+  green: "fill-[var(--tag-green)]",
+  amber: "fill-[var(--tag-amber)]",
+  orange: "fill-[var(--tag-orange)]",
+  red: "fill-[var(--tag-red)]",
+  pink: "fill-[var(--tag-pink)]",
+  slate: "fill-[var(--tag-slate)]",
+};
+
 // Подписи цветов для доступности (aria-label кружков в форме тега).
 const TAG_COLOR_LABELS: Record<TagColor, string> = {
   violet: "Фиолетовый",
@@ -54,6 +73,31 @@ export function TagDot({ color, className }: { color: TagColor; className?: stri
       aria-hidden
       className={cn("inline-block size-2 shrink-0 rounded-full", TAG_DOT_CLASS[color], className)}
     />
+  );
+}
+
+/** Компактный ряд тегов: только цветные точки, названия доступны в tooltip. */
+export function CompactTagList({ tags }: { tags: Tag[] }) {
+  return (
+    <TooltipProvider>
+      <span className="inline-flex flex-nowrap items-center gap-1.5">
+        {tags.map((tag) => (
+          <Tooltip key={tag.id}>
+            <TooltipTrigger asChild>
+              <span role="img" aria-label={tag.name} className="inline-flex shrink-0">
+                <TagDot color={tag.color} className="size-3" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent
+              className={TAG_COLOR_CLASS[tag.color]}
+              arrowClassName={TAG_TOOLTIP_ARROW_CLASS[tag.color]}
+            >
+              {tag.name}
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </span>
+    </TooltipProvider>
   );
 }
 
