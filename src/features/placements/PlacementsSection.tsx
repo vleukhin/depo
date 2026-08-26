@@ -35,8 +35,10 @@ import {
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -60,7 +62,7 @@ import { SortableCard, SortableRow, SortableRows } from "@/components/SortableRo
 import { UsdtAmount } from "@/components/UsdtAmount";
 import { TrxAmount } from "@/components/TrxAmount";
 import { PlacementIcon } from "@/components/PlacementIcon";
-import { CompactTagList, TagBadge, TagToggle } from "@/components/TagBadge";
+import { CompactTagList, TagBadge, TagDot, TagToggle } from "@/components/TagBadge";
 import { isTronAddress } from "@/lib/tron";
 import { cn } from "@/lib/utils";
 import {
@@ -289,6 +291,65 @@ export function PlacementsSection() {
             </span>
           </Button>
         </>
+      }
+      mobileActions={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" aria-label="Меню раздела">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-[min(70vh,28rem)] w-64 overflow-y-auto">
+            <DropdownMenuItem onSelect={() => setDayTxOpen(true)}>
+              <History />
+              Транзакции
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setSummaryOpen(true)}>
+              <BarChart3 />
+              Сводка
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/archive/placements">
+                <Archive />
+                Архив
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Теги</DropdownMenuLabel>
+            <DropdownMenuCheckboxItem
+              checked={compactTags}
+              onCheckedChange={toggleCompactTags}
+              onSelect={(event) => event.preventDefault()}
+            >
+              <Tags />
+              Компактный вид
+            </DropdownMenuCheckboxItem>
+            {tags.map((tag) => (
+              <DropdownMenuCheckboxItem
+                key={tag.id}
+                checked={filterTags.includes(tag.id)}
+                onCheckedChange={() => toggleFilterTag(tag.id)}
+                onSelect={(event) => event.preventDefault()}
+              >
+                <TagDot color={tag.color} className="size-2.5" />
+                <span className="min-w-0 truncate">{tag.name}</span>
+              </DropdownMenuCheckboxItem>
+            ))}
+            <DropdownMenuItem asChild>
+              <Link href="/tags">
+                <Pencil />
+                Управление тегами
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={check.isPending} onSelect={checkBalances}>
+              <RefreshCw className={check.isPending ? "animate-spin" : undefined} />
+              {check.isPending ? "Проверка…" : "Проверить балансы"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       }
     >
       {/* Состояние фильтра видно на всех разрешениях: на мобильном кнопка — одна иконка. */}

@@ -122,6 +122,31 @@ export function DebtsSection() {
           </Button>
         </>
       }
+      mobileActions={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" aria-label="Меню раздела">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setSummaryOpen(true)}>
+              <BarChart3 />
+              Сводка
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/archive/debts">
+                <Archive />
+                Архив
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setManagersOpen(true)}>
+              <Users />
+              Менеджеры
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      }
     >
       <div className="hidden overflow-x-auto md:block">
         <SortableRows ids={debts.map((d) => d.id)} onReorder={(ids) => reorder.mutate(ids)}>

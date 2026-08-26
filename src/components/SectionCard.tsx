@@ -19,6 +19,7 @@ export function SectionCard({
   description,
   onAdd,
   actions,
+  mobileActions,
   children,
 }: {
   id: string;
@@ -26,6 +27,7 @@ export function SectionCard({
   description: string;
   onAdd: () => void;
   actions?: React.ReactNode;
+  mobileActions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [collapsed, toggle] = useCollapsed(id);
@@ -49,7 +51,12 @@ export function SectionCard({
           className="flex items-center gap-2"
           onClick={(e) => e.stopPropagation()}
         >
-          {actions}
+          {mobileActions && <div className="md:hidden">{mobileActions}</div>}
+          {actions && (
+            <div className={cn("items-center gap-2", mobileActions ? "hidden md:flex" : "flex")}>
+              {actions}
+            </div>
+          )}
           <Button size="sm" onClick={onAdd} aria-label="Добавить">
             <Plus className="size-4" />
             <span className="hidden md:inline">Добавить</span>
