@@ -57,14 +57,15 @@ export function NativeIcon({ chain, className }: { chain: Chain; className?: str
   );
 }
 
-// У монет разный порядок величины: тысячи TRX и сотые доли ETH. Округление
-// до целых (как у USDT) превратило бы 0.05 ETH в «0», поэтому число знаков
-// подбирается по величине.
+// TRX показываем целыми, а для BNB и ETH сохраняем дробную часть: округление
+// до целых превратило бы, например, 0.05 ETH в «0».
 const formatters = [0, 2, 4].map(
   (digits) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: digits }),
 );
 
-export function formatGas(value: number): string {
+export function formatGas(chain: Chain, value: number): string {
+  if (chain === "tron") return formatters[0].format(value);
+
   const abs = Math.abs(value);
   const formatter = abs >= 1000 ? formatters[0] : abs >= 1 ? formatters[1] : formatters[2];
   return formatter.format(value);
@@ -87,7 +88,7 @@ export function GasAmount({
       className={cn("inline-flex items-center gap-1 tabular-nums", className)}
       title={CHAIN_META[chain].native}
     >
-      {formatGas(value)}
+      {formatGas(chain, value)}
       <NativeIcon chain={chain} className={cn("size-3.5 shrink-0", iconClassName)} />
     </span>
   );

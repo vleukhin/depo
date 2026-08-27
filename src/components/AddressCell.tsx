@@ -4,15 +4,20 @@ import { CopyButton } from "@/components/CopyButton";
 import { CHAIN_META, explorerAddressUrl, isChainAddress } from "@/lib/chains";
 import type { Chain } from "@/types";
 
-// Адрес целиком; первые и последние 6 символов выделены на фоне приглушённой середины.
+// Первые и последние 10 символов адреса; крайние 6 выделены.
 function AddressText({ value }: { value: string }) {
   if (value.length <= 12) {
     return <span className="text-foreground font-semibold">{value}</span>;
   }
+
+  const isShort = value.length <= 20;
+
   return (
     <span className="whitespace-nowrap">
       <span className="text-foreground font-semibold">{value.slice(0, 6)}</span>
-      {value.slice(6, -6)}
+      {value.slice(6, isShort ? -6 : 10)}
+      {!isShort && "…"}
+      {!isShort && value.slice(-10, -6)}
       <span className="text-foreground font-semibold">{value.slice(-6)}</span>
     </span>
   );

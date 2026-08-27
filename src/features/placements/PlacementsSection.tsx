@@ -396,12 +396,12 @@ export function PlacementsSection() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8" />
-                <TableHead>Название</TableHead>
-                <TableHead>Теги</TableHead>
-                <TableHead className="text-right">Сумма</TableHead>
-                <TableHead className="text-right">Газ</TableHead>
-                <TableHead>Адрес / счёт</TableHead>
-                <TableHead>Комментарий</TableHead>
+                <TableHead className="text-center">Название</TableHead>
+                <TableHead className="text-center">Теги</TableHead>
+                <TableHead className="text-center">Сумма</TableHead>
+                <TableHead className="text-center">Газ</TableHead>
+                <TableHead className="text-center">Адрес / счёт</TableHead>
+                <TableHead className="text-center">Комментарий</TableHead>
                 <TableHead className="w-32" />
               </TableRow>
             </TableHeader>
