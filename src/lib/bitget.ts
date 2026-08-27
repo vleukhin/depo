@@ -165,7 +165,10 @@ function fieldToMicro(value: string | undefined): number {
  * (монета × 1 000 000). `spot` — спотовый счёт, `main` — funding-счёт Bitget.
  * Если активов нет — 0.
  */
-async function fetchCoinBalanceMicro(coin: string, account: "spot" | "main"): Promise<number> {
+export async function fetchCoinBalanceMicro(
+  coin: string,
+  account: "spot" | "main",
+): Promise<number> {
   if (account === "spot") {
     // `assetType: "all"` — иначе Bitget скрывает монеты с нулевым балансом
     const assets = await fetchSpotAssets({ coin, assetType: "all" });
@@ -188,16 +191,6 @@ export function fetchUsdtBalanceMicro(account: "spot" | "main"): Promise<number>
   return fetchCoinBalanceMicro("USDT", account);
 }
 
-/**
- * Доступный баланс TRX (только `available`, без замороженного в ордерах) на счёте
- * указанного типа, в целых micro-TRX (TRX × 1 000 000). `spot` — спотовый счёт,
- * `main` — funding-счёт Bitget. У TRX 6 знаков после запятой — как у USDT.
- * Если активов нет — 0.
- */
-export function fetchTrxBalanceMicro(account: "spot" | "main"): Promise<number> {
-  return fetchCoinBalanceMicro("TRX", account);
-}
-
 export interface BitgetAccountBalance {
   accountType: string; // spot / futures / funding / earn / bot / margin ...
   usdtBalance: string; // оценка счёта в USDT
@@ -208,16 +201,17 @@ export function fetchAllAccountBalances(): Promise<BitgetAccountBalance[]> {
   return signedRequest<BitgetAccountBalance[]>("GET", "/api/v2/account/all-account-balance");
 }
 
-// ================= КУРС TRX =================
+// ================= КУРСЫ =================
 
 /**
- * Текущий курс TRX/USDT (≈ USD) по публичному спотовому тикеру.
+ * Текущий курс монеты к USDT (≈ USD) по публичному спотовому тикеру
+ * (symbol — пара целиком, напр. "TRXUSDT" или "BNBUSDT").
  * Запрос не подписывается: публичные endpoint'ы не проверяют ни ключ,
  * ни IP-whitelist (подписанный запрос с не-whitelisted IP Bitget отвергает).
  * Прокси и таймаут — те же, что у приватных запросов.
  */
-export async function fetchTrxUsdtPrice(): Promise<number> {
-  const res = await fetch(`${BASE_URL}/api/v2/spot/market/tickers?symbol=TRXUSDT`, {
+export async function fetchSpotPrice(symbol: string): Promise<number> {
+  const res = await fetch(`${BASE_URL}/api/v2/spot/market/tickers?symbol=${symbol}`, {
     signal: AbortSignal.timeout(10_000),
     cache: "no-store",
     // dispatcher — опция undici, см. signedRequest.
@@ -229,12 +223,12 @@ export async function fetchTrxUsdtPrice(): Promise<number> {
   }
   const price = Number(json.data?.[0]?.lastPr);
   if (!Number.isFinite(price) || price <= 0) {
-    throw new Error("Bitget: не удалось получить курс TRX");
+    throw new Error(`Bitget: не удалось получить курс ${symbol}`);
   }
   return price;
 }
 
-// ================= ВЫВОД TRX =================
+// ================= ВЫВОД МОНЕТ =================
 
 interface BitgetCoinChain {
   chain: string; // имя сети, напр. "TRX" (TRON)
@@ -255,26 +249,30 @@ const toNumberOrNull = (value: string | undefined): number | null => {
 };
 
 /**
- * Параметры вывода TRX в сети TRON: GET /api/v2/spot/public/coins?coin=TRX.
- * Из списка сетей монеты берём запись сети TRON (обычно `chain === "TRX"`),
- * иначе — первую доступную для вывода. Возвращает имя сети (для параметра
- * `chain` при выводе), минимальную сумму и комиссию (или null, если не указаны).
+ * Параметры вывода монеты в нужной сети: GET /api/v2/spot/public/coins?coin=<coin>.
+ * Из списка сетей монеты берём запись с именем `preferredChain` (напр. "TRX",
+ * "BEP20", "ERC20"), иначе — первую доступную для вывода. Возвращает имя сети
+ * (для параметра `chain` при выводе), минимальную сумму и комиссию
+ * (или null, если биржа их не указала).
  */
-export async function fetchTrxWithdrawInfo(): Promise<{
+export async function fetchCoinWithdrawInfo(
+  coin: string,
+  preferredChain: string,
+): Promise<{
   chain: string;
   minAmount: number | null;
   fee: number | null;
 }> {
   const coins = await signedRequest<BitgetCoin[]>("GET", "/api/v2/spot/public/coins", {
-    query: { coin: "TRX" },
+    query: { coin },
   });
-  const chains = coins.find((c) => c.coin === "TRX")?.chains ?? [];
+  const chains = coins.find((c) => c.coin === coin)?.chains ?? [];
   const chain =
-    chains.find((c) => c.chain.toUpperCase() === "TRX") ??
+    chains.find((c) => c.chain.toUpperCase() === preferredChain.toUpperCase()) ??
     chains.find((c) => c.withdrawable === "true") ??
     chains[0];
   if (!chain) {
-    throw new Error("Bitget: сеть TRON для TRX недоступна");
+    throw new Error(`Bitget: сеть ${preferredChain} для ${coin} недоступна`);
   }
   return {
     chain: chain.chain,
@@ -284,12 +282,14 @@ export async function fetchTrxWithdrawInfo(): Promise<{
 }
 
 /**
- * On-chain вывод TRX со спотового счёта на внешний адрес:
- * POST /api/v2/spot/wallet/withdrawal. `size` — десятичная строка в TRX (не micro),
- * `chain` — имя сети из fetchTrxWithdrawInfo. Возвращает orderId созданной заявки.
- * Требует API-ключ с правом Withdraw (и, как правило, адрес в whitelist Bitget).
+ * On-chain вывод монеты со спотового счёта на внешний адрес:
+ * POST /api/v2/spot/wallet/withdrawal. `size` — десятичная строка в монете
+ * (не micro), `chain` — имя сети из fetchCoinWithdrawInfo. Возвращает orderId
+ * созданной заявки. Требует API-ключ с правом Withdraw (и, как правило,
+ * адрес в whitelist Bitget).
  */
-export async function withdrawTrx(params: {
+export async function withdrawCoin(params: {
+  coin: string;
   address: string;
   amount: number;
   chain: string;
@@ -299,7 +299,7 @@ export async function withdrawTrx(params: {
     "/api/v2/spot/wallet/withdrawal",
     {
       body: {
-        coin: "TRX",
+        coin: params.coin,
         transferType: "on_chain",
         address: params.address,
         chain: params.chain,

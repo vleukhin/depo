@@ -1,8 +1,8 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { HeroCard } from "@/features/dashboard/HeroCard";
-import { TrxHeroCard } from "@/features/dashboard/TrxHeroCard";
+import { GasHeroCard } from "@/features/dashboard/GasHeroCard";
 import { DepoStructureCard } from "@/features/dashboard/DepoStructureCard";
-import { TrxChartCard } from "@/features/dashboard/TrxChartCard";
+import { GasChartCard } from "@/features/dashboard/GasChartCard";
 import { PlacementsSection } from "@/features/placements/PlacementsSection";
 import { DebtsSection } from "@/features/debts/DebtsSection";
 
@@ -16,15 +16,15 @@ export default function Home() {
           <div className="lg:col-span-2">
             <HeroCard />
           </div>
-          <TrxHeroCard />
+          <GasHeroCard />
         </div>
       </section>
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-12 space-y-8">
-        {/* Ряд диаграмм: структура депо (донат) и динамика TRX. */}
+        {/* Ряд диаграмм: структура депо (донат) и динамика газа. */}
         <div className="grid gap-5 lg:grid-cols-2 mb-6 items-start">
           <DepoStructureCard />
-          <TrxChartCard />
+          <GasChartCard />
         </div>
 
         <div className="space-y-6">

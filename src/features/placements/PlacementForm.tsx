@@ -26,8 +26,10 @@ import { useCreatePlacement, useUpdatePlacement } from "@/hooks/usePlacements";
 import { useTags } from "@/hooks/useTags";
 import { TagToggle } from "@/components/TagBadge";
 import {
+  CHAINS,
   EXCHANGE_ACCOUNTS,
   EXCHANGES,
+  type Chain,
   type Exchange,
   type ExchangeAccount,
   type Placement,
@@ -35,6 +37,8 @@ import {
   type PlacementKind,
 } from "@/types";
 import { PlacementIcon, PLACEMENT_ICON_OPTIONS } from "@/components/PlacementIcon";
+import { NativeIcon } from "@/components/GasAmount";
+import { CHAIN_META } from "@/lib/chains";
 
 // Значение-заглушка для варианта «без иконки» (Select не допускает пустой value).
 const NO_ICON = "__none__";
@@ -72,6 +76,7 @@ export function PlacementForm({
       name: placement?.name ?? "",
       amount: placement?.amount ?? 0,
       kind: placement?.kind ?? "wallet",
+      chain: placement?.chain ?? "tron",
       address: placement?.address ?? "",
       exchange: placement?.exchange ?? null,
       exchange_account: placement?.exchange_account ?? null,
@@ -82,6 +87,7 @@ export function PlacementForm({
   });
 
   const kind = watch("kind");
+  const chain = watch("chain") ?? "tron";
   const exchange = watch("exchange");
   const exchangeAccount = watch("exchange_account");
   const icon = watch("icon");
@@ -123,23 +129,52 @@ export function PlacementForm({
           {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
         </div>
       </div>
-      <div className="space-y-2">
-        <Label>Где хранятся</Label>
-        <Select
-          value={kind}
-          onValueChange={(v) => setValue("kind", v as PlacementKind)}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.entries(KIND_LABELS) as [PlacementKind, string][]).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Где хранятся</Label>
+          <Select
+            value={kind}
+            onValueChange={(v) => setValue("kind", v as PlacementKind, { shouldValidate: true })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.entries(KIND_LABELS) as [PlacementKind, string][]).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Сеть</Label>
+          <Select
+            value={chain}
+            onValueChange={(v) => setValue("chain", v as Chain, { shouldValidate: true })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CHAINS.map((c) => (
+                <SelectItem key={c} value={c}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <NativeIcon chain={c} className="size-3.5" />
+                    {CHAIN_META[c].label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* У биржевой строки адреса нет — сеть задаёт только монету газа. */}
+          {kind === "exchange" && (
+            <p className="text-xs text-muted-foreground">
+              Монета газа: {CHAIN_META[chain].native}
+            </p>
+          )}
+        </div>
       </div>
       {kind === "exchange" ? (
         <div className="grid grid-cols-2 gap-4">
@@ -193,7 +228,14 @@ export function PlacementForm({
       ) : (
         <div className="space-y-2">
           <Label htmlFor="p-address">Адрес</Label>
-          <Input id="p-address" placeholder="Адрес кошелька / счёта" {...register("address")} />
+          <Input
+            id="p-address"
+            placeholder={`Адрес кошелька в сети ${CHAIN_META[chain].label}`}
+            {...register("address")}
+          />
+          {errors.address && (
+            <p className="text-sm text-destructive">{errors.address.message}</p>
+          )}
         </div>
       )}
       <div className="space-y-2">

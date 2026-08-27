@@ -51,8 +51,17 @@ async function migrate(db: Client) {
   await ensureColumn(db, "placements", "sort_order", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(db, "debts", "sort_order", "INTEGER NOT NULL DEFAULT 0");
   await ensureColumn(db, "placements", "chain_checked_at", "TEXT", { backfillFromId: false });
-  // Баланс нативного TRX (SUN = micro-TRX), NULL — ещё не проверяли.
-  await ensureColumn(db, "placements", "trx_amount", "INTEGER", { backfillFromId: false });
+  // Сеть записи: всё, что заведено до поддержки BSC/ETH, — это TRON.
+  await ensureColumn(
+    db,
+    "placements",
+    "chain",
+    "TEXT NOT NULL DEFAULT 'tron' CHECK (chain IN ('tron','bsc','ethereum'))",
+    { backfillFromId: false },
+  );
+  // Нативный баланс стал мультисетевым: TRX -> монета своей сети (micro-единицы).
+  await renameColumn(db, "placements", "trx_amount", "native_amount");
+  await ensureColumn(db, "placements", "native_amount", "INTEGER", { backfillFromId: false });
   await dropColumn(db, "placements", "chain_balance"); // колонка из ранней версии, сумма пишется в amount
   await dropColumn(db, "placements", "place"); // поле «место / платформа» убрано
   // Хранение на бирже: существующие строки — внешние кошельки (kind = 'wallet').
@@ -112,6 +121,21 @@ async function migrate(db: Client) {
   await ensureColumn(db, "debts", "deleted_at", "TEXT", { backfillFromId: false });
   // Хэш ончейн-транзакции, если долг заведён из истории кошелька; NULL — вручную.
   await ensureColumn(db, "debts", "tx_id", "TEXT", { backfillFromId: false });
+  // Итоги газа в снимках депо: одна колонка TRX -> JSON {сеть: micro-единицы}.
+  await ensureColumn(db, "depo_snapshots", "total_native", "TEXT", { backfillFromId: false });
+  if ((await columnNames(db, "depo_snapshots")).has("total_trx")) {
+    await db.execute(
+      `UPDATE depo_snapshots SET total_native = '{"tron":' || total_trx || '}' WHERE total_native IS NULL`,
+    );
+    await dropColumn(db, "depo_snapshots", "total_trx");
+  }
+  await db.execute("UPDATE depo_snapshots SET total_native = '{}' WHERE total_native IS NULL");
+  // История TRX переезжает в общую таблицу снимков газа. Идемпотентно за счёт
+  // PK (date, chain): повторный запуск миграции ничего не перезапишет.
+  await db.execute(
+    "INSERT OR IGNORE INTO native_snapshots (date, chain, amount) " +
+      "SELECT date, 'tron', trx_amount FROM trx_snapshots",
+  );
 }
 
 async function columnNames(db: Client, table: string): Promise<Set<string>> {
@@ -122,6 +146,14 @@ async function columnNames(db: Client, table: string): Promise<Set<string>> {
 async function dropColumn(db: Client, table: string, column: string) {
   if ((await columnNames(db, table)).has(column)) {
     await db.execute(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+  }
+}
+
+/** Переименование колонки; no-op, если старой нет или новая уже на месте. */
+async function renameColumn(db: Client, table: string, from: string, to: string) {
+  const columns = await columnNames(db, table);
+  if (columns.has(from) && !columns.has(to)) {
+    await db.execute(`ALTER TABLE ${table} RENAME COLUMN ${from} TO ${to}`);
   }
 }
 
@@ -157,6 +189,7 @@ CREATE TABLE IF NOT EXISTS placements (
   name       TEXT    NOT NULL,
   amount     INTEGER NOT NULL DEFAULT 0,
   kind       TEXT    NOT NULL DEFAULT 'wallet' CHECK (kind IN ('wallet','exchange')),
+  chain      TEXT    NOT NULL DEFAULT 'tron' CHECK (chain IN ('tron','bsc','ethereum')),
   address    TEXT,
   exchange   TEXT    CHECK (exchange IS NULL OR exchange IN ('KuCoin','Bitget')),
   exchange_account TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main')),
@@ -164,7 +197,7 @@ CREATE TABLE IF NOT EXISTS placements (
   comment    TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   chain_checked_at TEXT,
-  trx_amount INTEGER,
+  native_amount INTEGER,
   deleted_at TEXT,
   created_at TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -196,8 +229,20 @@ CREATE TABLE IF NOT EXISTS debts (
   FOREIGN KEY (manager_id) REFERENCES managers(id) ON DELETE RESTRICT
 );
 
--- Ежедневные снимки суммарного TRX по всем записям. Сумма — SUN (micro-TRX).
+-- Ежедневные снимки суммарного газа по каждой сети. Сумма — micro-единицы
+-- монеты (SUN у TRX; у 18-значных BNB/ETH баланс округляется до 6 знаков).
 -- date — календарный день по МСК (UTC+3 без перехода на летнее время).
+CREATE TABLE IF NOT EXISTS native_snapshots (
+  date       TEXT NOT NULL,
+  chain      TEXT NOT NULL CHECK (chain IN ('tron','bsc','ethereum')),
+  amount     INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (date, chain)
+);
+
+-- Устарела: единственный источник разовой миграции истории TRX в native_snapshots.
+-- Новые снимки сюда не пишутся; таблица остаётся как страховка на старых БД.
 CREATE TABLE IF NOT EXISTS trx_snapshots (
   date       TEXT PRIMARY KEY,
   trx_amount INTEGER NOT NULL,
@@ -206,15 +251,16 @@ CREATE TABLE IF NOT EXISTS trx_snapshots (
 );
 
 -- Снимки состояния депо: замороженная копия всех блоков (средства, свободные средства,
--- долги) на момент нажатия кнопки. Итоги — micro-USDT (total_trx — SUN), data —
--- JSON с доменными объектами (десятичные суммы, как отдаёт API).
+-- долги) на момент нажатия кнопки. Итоги — micro-USDT, total_native — JSON
+-- {сеть: micro-единицы монеты}, data — JSON с доменными объектами
+-- (десятичные суммы, как отдаёт API).
 CREATE TABLE IF NOT EXISTS depo_snapshots (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   comment          TEXT,
   total_funds      INTEGER NOT NULL,
   total_placements INTEGER NOT NULL,
   total_debts      INTEGER NOT NULL,
-  total_trx        INTEGER NOT NULL,
+  total_native     TEXT    NOT NULL DEFAULT '{}',
   data             TEXT    NOT NULL,
   created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
 );

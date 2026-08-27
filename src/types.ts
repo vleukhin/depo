@@ -4,6 +4,15 @@ export type Service = (typeof SERVICES)[number];
 // Свободные средства: внешний кошелёк или счёт на бирже.
 export type PlacementKind = "wallet" | "exchange";
 
+// Сеть записи: определяет источник баланса, формат адреса и нативную монету
+// («газ»). Список дублируется в CHECK-констрейнте placements.chain (lib/db.ts);
+// параметры сетей — в CHAIN_META (lib/chains.ts).
+export const CHAINS = ["tron", "bsc", "ethereum"] as const;
+export type Chain = (typeof CHAINS)[number];
+
+// Сети с EVM-совместимым RPC (всё, кроме TRON).
+export type EvmChain = Exclude<Chain, "tron">;
+
 export const EXCHANGES = ["KuCoin", "Bitget"] as const;
 export type Exchange = (typeof EXCHANGES)[number];
 
@@ -57,24 +66,25 @@ export interface Placement {
   name: string;
   amount: number;
   kind: PlacementKind;
+  chain: Chain; // сеть записи: адрес кошелька / монета газа на бирже
   address: string | null; // только для kind = 'wallet'
   exchange: Exchange | null; // только для kind = 'exchange'
   exchange_account: ExchangeAccount | null; // тип счёта на бирже
   icon: PlacementIconId | null; // иконка записи (выбирается вручную), NULL — без иконки
   comment: string | null;
   chain_checked_at: string | null; // когда сумма обновлялась из сети/с биржи, NULL — никогда
-  trx_amount: number | null; // баланс нативного TRX (в TRX), NULL — не проверяли
+  native_amount: number | null; // баланс нативной монеты своей сети (в монетах), NULL — не проверяли
   tags: Tag[]; // теги записи по алфавиту; заполняет репозиторий отдельным запросом
   deleted_at: string | null; // мягкое удаление: NULL — активно
   created_at: string;
   updated_at: string;
 }
 
-// Перевод TRC-20 (USDT) для попапа истории транзакций кошелька. Сумма — десятичные USDT.
-export interface Trc20Transfer {
+// Перевод USDT для попапа истории транзакций кошелька. Сумма — десятичные USDT.
+export interface UsdtTransfer {
   tx_id: string; // хэш транзакции
-  from: string; // отправитель (TRON-адрес)
-  to: string; // получатель (TRON-адрес)
+  from: string; // отправитель (адрес в сети кошелька)
+  to: string; // получатель (адрес в сети кошелька)
   amount: number; // сумма перевода в десятичных единицах токена
   symbol: string; // тикер токена (USDT)
   timestamp: number; // время блока, мс от эпохи
@@ -82,10 +92,11 @@ export interface Trc20Transfer {
   debt?: TransferDebtRef | null; // активный долг, заведённый по этой транзакции (заполняет роут)
 }
 
-// Страница переводов TRC-20 с курсором пагинации TronGrid.
-export interface Trc20TransfersPage {
-  transfers: Trc20Transfer[];
-  next: string | null; // fingerprint следующей страницы; null — переводов больше нет
+// Страница переводов USDT с непрозрачным курсором пагинации: у TRON это
+// fingerprint TronGrid, у EVM — номер следующей страницы Etherscan.
+export interface UsdtTransfersPage {
+  transfers: UsdtTransfer[];
+  next: string | null; // курсор следующей страницы; null — переводов больше нет
 }
 
 // Ссылка на долг, привязанный к переводу (метка в попапе транзакций).
@@ -97,9 +108,10 @@ export interface TransferDebtRef {
 }
 
 // Перевод в дневной сводке по всем кошелькам: та же строка + кошелёк, к которому она относится.
-export interface WalletTransfer extends Trc20Transfer {
+export interface WalletTransfer extends UsdtTransfer {
   placement_id: number;
   placement_name: string;
+  chain: Chain; // сеть кошелька — для ссылок в обозреватель
   internal_with?: string | null; // название второго нашего кошелька (перевод между своими)
 }
 
@@ -114,17 +126,17 @@ export interface DayTransfers {
 export interface CheckBalancesResult {
   checked: number;
   failed: { id: number; name: string; error: string }[];
-  skipped: number; // строки-кошельки без валидного TRON-адреса
+  skipped: number; // строки-кошельки без валидного адреса для своей сети
 }
 
-// Данные для попапа пополнения TRX с биржи. Суммы — десятичные TRX.
-export interface ExchangeTrxInfo {
-  balance: number; // баланс TRX на спотовом счёте биржи
+// Данные для попапа пополнения газа с биржи. Суммы — в десятичных единицах монеты.
+export interface ExchangeGasInfo {
+  balance: number; // баланс монеты на спотовом счёте биржи
   fee: number | null; // комиссия сети за вывод, null — неизвестна
   min: number | null; // минимальная сумма вывода, null — неизвестна
 }
 
-export interface WithdrawTrxResult {
+export interface WithdrawGasResult {
   orderId: string; // id заявки на вывод, созданной биржей
 }
 
@@ -145,6 +157,7 @@ export interface Debt {
   service: Service | null;
   placement_id: number | null;
   placement_name: string | null; // подтягивается через LEFT JOIN
+  placement_chain: Chain | null; // сеть источника (для ссылки на транзакцию), NULL — источник неизвестен
   source_text: string | null;
   tx_id: string | null; // хэш ончейн-транзакции, если долг заведён из истории кошелька
   comment: string | null;
@@ -176,7 +189,7 @@ export interface Summary {
   total_funds: number;
   total_placements: number;
   total_debts: number;
-  total_trx: number; // суммарный TRX по всем записям (информационно, вне сверки)
+  total_native: Record<Chain, number>; // суммарный газ по сетям (информационно, вне сверки)
   diff: number; // (свободные средства + долги) − депо: >0 избыток, <0 недостача
   balanced: boolean;
 }
@@ -188,7 +201,7 @@ export interface DepoSnapshot {
   total_funds: number;
   total_placements: number;
   total_debts: number;
-  total_trx: number; // суммарный TRX (информационно)
+  total_native: Record<Chain, number>; // суммарный газ по сетям (информационно)
   diff: number; // (свободные средства + долги) − депо на момент снимка
   balanced: boolean;
   created_at: string; // UTC-момент создания снимка
@@ -201,16 +214,15 @@ export interface DepoSnapshotDetail extends DepoSnapshot {
   debts: Debt[];
 }
 
-// Снимок суммарного TRX за день. Сумма — десятичные TRX.
-export interface TrxSnapshot {
+// Снимок суммарного газа одной сети за день. Сумма — в десятичных монетах.
+export interface NativeSnapshot {
   date: string; // календарный день по МСК (YYYY-MM-DD)
-  trx_amount: number;
+  amount: number;
 }
 
-// Текущий курс TRX. Десятичные USDT (≈ USD) за 1 TRX; null — курс недоступен.
-export interface TrxPrice {
-  price: number | null;
-}
+// Текущие курсы нативных монет: десятичные USDT (≈ USD) за 1 монету;
+// null — курс сети недоступен.
+export type NativePrices = Record<Chain, number | null>;
 
 // --- Telegram-бот: черновики долгов ---
 

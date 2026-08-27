@@ -20,38 +20,46 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrxAmount } from "@/components/TrxAmount";
-import { formatAmount, formatDate, formatDateShort } from "@/lib/format";
+import { GasAmount, formatGas } from "@/components/GasAmount";
+import { CHAIN_META } from "@/lib/chains";
+import { formatDate, formatDateShort } from "@/lib/format";
 import { useCollapsed } from "@/hooks/useCollapsed";
-import { useTrxSnapshots } from "@/hooks/useTrxSnapshots";
+import { useNativeSnapshots } from "@/hooks/useNativeSnapshots";
 import { cn } from "@/lib/utils";
-import type { TrxSnapshot } from "@/types";
+import { CHAINS, type Chain, type NativeSnapshot } from "@/types";
 
 const PERIODS = [7, 30, 90] as const;
 
-/** Тултип точки: полная дата и сумма TRX. Recharts сам подставляет active/payload. */
+/** Тултип точки: полная дата и сумма газа. Recharts сам подставляет active/payload. */
 function SnapshotTooltip({
   active,
   payload,
+  chain,
 }: {
   active?: boolean;
-  payload?: ReadonlyArray<{ payload: TrxSnapshot }>;
+  payload?: ReadonlyArray<{ payload: NativeSnapshot }>;
+  chain: Chain;
 }) {
   const point = active ? payload?.[0]?.payload : undefined;
   if (!point) return null;
   return (
     <div className="rounded-md border bg-popover px-2.5 py-1.5 text-xs shadow-sm">
       <p className="text-muted-foreground">{formatDate(point.date)}</p>
-      <TrxAmount value={point.trx_amount} className="font-medium" />
+      <GasAmount chain={chain} value={point.amount} className="font-medium" />
     </div>
   );
 }
 
-/** График динамики суммарного TRX по ежедневным снимкам (trx_snapshots). */
-export function TrxChartCard() {
-  const [collapsed, toggle] = useCollapsed("trx-chart", true);
+/**
+ * График динамики суммарного газа по ежедневным снимкам (native_snapshots).
+ * Сети переключаются, а не рисуются вместе: тысячи TRX и сотые доли ETH
+ * на общей оси Y нечитаемы.
+ */
+export function GasChartCard() {
+  const [collapsed, toggle] = useCollapsed("gas-chart", true);
   const [days, setDays] = useState<(typeof PERIODS)[number]>(30);
-  const { data } = useTrxSnapshots(days);
+  const [chain, setChain] = useState<Chain>("tron");
+  const { data } = useNativeSnapshots(chain, days);
   const points = data ?? [];
 
   return (
@@ -64,14 +72,25 @@ export function TrxChartCard() {
               collapsed && "-rotate-90",
             )}
           />
-          Динамика TRX
+          Динамика газа
         </CardTitle>
         <CardDescription className="hidden pl-6 md:block">
-          Суммарный TRX на конец дня
+          Суммарный {CHAIN_META[chain].native} на конец дня
         </CardDescription>
-        {/* Переключатель периода нужен только в развёрнутой карточке; клик по нему не схлопывает её. */}
+        {/* Переключатели нужны только в развёрнутой карточке; клик по ним не схлопывает её. */}
         {!collapsed && (
-          <CardAction className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          <CardAction className="flex flex-wrap justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+            {CHAINS.map((c) => (
+              <Button
+                key={c}
+                size="sm"
+                variant={c === chain ? "secondary" : "ghost"}
+                onClick={() => setChain(c)}
+              >
+                {CHAIN_META[c].native}
+              </Button>
+            ))}
+            <span aria-hidden className="w-2" />
             {PERIODS.map((p) => (
               <Button
                 key={p}
@@ -97,7 +116,7 @@ export function TrxChartCard() {
                 {/* Ось X категориальная: дни, пропущенные кроном, соединяются линией через разрыв. */}
                 <AreaChart data={points} margin={{ top: 8, right: 8 }}>
                   <defs>
-                    <linearGradient id="trxFill" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="gasFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.25} />
                       <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
                     </linearGradient>
@@ -112,20 +131,23 @@ export function TrxChartCard() {
                     minTickGap={24}
                   />
                   <YAxis
-                    tickFormatter={formatAmount}
+                    tickFormatter={formatGas}
                     tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
-                    width={48}
+                    width={56}
                     domain={["auto", "auto"]}
                   />
-                  <Tooltip content={<SnapshotTooltip />} cursor={{ stroke: "var(--border)" }} />
+                  <Tooltip
+                    content={<SnapshotTooltip chain={chain} />}
+                    cursor={{ stroke: "var(--border)" }}
+                  />
                   <Area
                     type="monotone"
-                    dataKey="trx_amount"
+                    dataKey="amount"
                     stroke="var(--chart-1)"
                     strokeWidth={2}
-                    fill="url(#trxFill)"
+                    fill="url(#gasFill)"
                     dot={false}
                     activeDot={{ r: 4 }}
                   />

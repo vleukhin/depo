@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { DeleteButton } from "@/components/DeleteButton";
 import { UsdtAmount } from "@/components/UsdtAmount";
-import { TrxAmount } from "@/components/TrxAmount";
+import { GasTotals } from "@/components/GasAmount";
 import { ReconciliationPill } from "@/components/ReconciliationPill";
 import { formatDateTime } from "@/lib/format";
 import { useDeleteSnapshot, useSnapshots } from "@/hooks/useSnapshots";
@@ -43,7 +43,7 @@ export function SnapshotsList() {
                 <TableHead className="text-right">Депо</TableHead>
                 <TableHead className="text-right">Свободные</TableHead>
                 <TableHead className="text-right">Долги</TableHead>
-                <TableHead className="text-right">TRX</TableHead>
+                <TableHead className="text-right">Газ</TableHead>
                 <TableHead>Сверка</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
@@ -72,7 +72,7 @@ export function SnapshotsList() {
                     <UsdtAmount value={s.total_debts} />
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    <TrxAmount value={s.total_trx} />
+                    <GasTotals totals={s.total_native} />
                   </TableCell>
                   <TableCell>
                     <ReconciliationPill balanced={s.balanced} diff={s.diff} />
@@ -138,9 +138,9 @@ export function SnapshotsList() {
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-2">
-                  <dt>TRX</dt>
+                  <dt>Газ</dt>
                   <dd>
-                    <TrxAmount value={s.total_trx} className="text-foreground" />
+                    <GasTotals totals={s.total_native} className="text-foreground" />
                   </dd>
                 </div>
               </dl>

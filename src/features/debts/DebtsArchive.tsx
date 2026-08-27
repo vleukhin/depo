@@ -82,7 +82,7 @@ export function DebtsArchive() {
                   <TableCell className="text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
                       <SourceCell debt={debt} />
-                      <TxLink txId={debt.tx_id} />
+                      <TxLink chain={debt.placement_chain ?? "tron"} txId={debt.tx_id} />
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
@@ -121,7 +121,7 @@ export function DebtsArchive() {
                 <span className="font-medium">{debt.manager_name ?? "—"}</span>
                 <span className="inline-flex items-center gap-1.5 text-base font-semibold tabular-nums">
                   {formatUsdt(debt.amount)}
-                  <TxLink txId={debt.tx_id} />
+                  <TxLink chain={debt.placement_chain ?? "tron"} txId={debt.tx_id} />
                 </span>
               </div>
               <dl className="mt-2 space-y-1.5 text-xs text-muted-foreground">

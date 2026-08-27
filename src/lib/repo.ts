@@ -1,6 +1,7 @@
 import type { Row } from "@libsql/client";
 import { getClient } from "@/lib/db";
 import { fromMicro, toMicro } from "@/lib/money";
+import { CHAINS } from "@/types";
 import type {
   Fund,
   Manager,
@@ -17,7 +18,8 @@ import type {
   ExchangeAccount,
   TgDraft,
   TgDraftStatus,
-  TrxSnapshot,
+  Chain,
+  NativeSnapshot,
   DebtsSummary,
   DebtsSummaryRow,
   DepoSnapshot,
@@ -48,13 +50,14 @@ const toPlacement = (r: Row): Placement => ({
   name: String(r.name),
   amount: fromMicro(Number(r.amount)),
   kind: r.kind as PlacementKind,
+  chain: (r.chain as Chain | null) ?? "tron",
   address: (r.address as string | null) ?? null,
   exchange: (r.exchange as Exchange | null) ?? null,
   exchange_account: (r.exchange_account as ExchangeAccount | null) ?? null,
   icon: (r.icon as PlacementIconId | null) ?? null,
   comment: (r.comment as string | null) ?? null,
   chain_checked_at: (r.chain_checked_at as string | null) ?? null,
-  trx_amount: r.trx_amount === null ? null : fromMicro(Number(r.trx_amount)),
+  native_amount: r.native_amount === null ? null : fromMicro(Number(r.native_amount)),
   // Теги догружает withTags отдельным запросом — в строке placements их нет.
   tags: [],
   deleted_at: (r.deleted_at as string | null) ?? null,
@@ -91,6 +94,7 @@ const toDebt = (r: Row): Debt => ({
   service: (r.service as Service | null) ?? null,
   placement_id: r.placement_id === null ? null : Number(r.placement_id),
   placement_name: (r.placement_name as string | null) ?? null,
+  placement_chain: (r.placement_chain as Chain | null) ?? null,
   source_text: (r.source_text as string | null) ?? null,
   tx_id: (r.tx_id as string | null) ?? null,
   comment: (r.comment as string | null) ?? null,
@@ -350,11 +354,12 @@ export async function getPlacement(id: number): Promise<Placement | null> {
 export async function createPlacement(input: PlacementInput): Promise<Placement> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "INSERT INTO placements (name, amount, kind, address, exchange, exchange_account, icon, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
+    sql: "INSERT INTO placements (name, amount, kind, chain, address, exchange, exchange_account, icon, comment, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM placements))",
     args: [
       input.name,
       toMicro(input.amount),
       input.kind,
+      input.chain,
       input.address,
       input.exchange,
       input.exchange_account,
@@ -373,11 +378,12 @@ export async function updatePlacement(
 ): Promise<Placement | null> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "UPDATE placements SET name = ?, amount = ?, kind = ?, address = ?, exchange = ?, exchange_account = ?, icon = ?, comment = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
+    sql: "UPDATE placements SET name = ?, amount = ?, kind = ?, chain = ?, address = ?, exchange = ?, exchange_account = ?, icon = ?, comment = ?, updated_at = datetime('now') WHERE id = ? AND deleted_at IS NULL",
     args: [
       input.name,
       toMicro(input.amount),
       input.kind,
+      input.chain,
       input.address,
       input.exchange,
       input.exchange_account,
@@ -415,7 +421,11 @@ export async function restorePlacement(id: number): Promise<Placement | null> {
 }
 
 // ================= DEBTS =================
-const DEBT_FIELDS = "d.*, p.name AS placement_name, m.name AS manager_name";
+// Сеть источника берётся подзапросом, а не из JOIN: имя источника скрывается,
+// пока запись в архиве, но ссылка на транзакцию должна вести в нужный обозреватель.
+const DEBT_FIELDS =
+  "d.*, p.name AS placement_name, m.name AS manager_name, " +
+  "(SELECT chain FROM placements WHERE id = d.placement_id) AS placement_chain";
 // Активные представления: имя источника скрыто, пока запись в архиве (JOIN не матчится).
 const DEBT_SELECT =
   `SELECT ${DEBT_FIELDS} FROM debts d ` +
@@ -581,17 +591,18 @@ export async function getDebtsSummary(from: string, to: string): Promise<DebtsSu
 
 /** Внешние кошельки с адресом — источники переводов для дневной сводки транзакций. */
 export async function listWalletPlacementsWithAddress(): Promise<
-  { id: number; name: string; address: string }[]
+  { id: number; name: string; chain: Chain; address: string }[]
 > {
   const db = await getClient();
   const rs = await db.execute(
-    "SELECT id, name, address FROM placements " +
+    "SELECT id, name, chain, address FROM placements " +
       "WHERE kind = 'wallet' AND address IS NOT NULL AND address != '' AND deleted_at IS NULL " +
       "ORDER BY sort_order ASC, id ASC",
   );
   return rs.rows.map((r) => ({
     id: Number(r.id),
     name: String(r.name),
+    chain: (r.chain as Chain | null) ?? "tron",
     address: String(r.address),
   }));
 }
@@ -599,45 +610,53 @@ export async function listWalletPlacementsWithAddress(): Promise<
 // ================= CHAIN / EXCHANGE BALANCE =================
 /** Строки свободных средств с адресами — кандидаты на проверку баланса в сети. */
 export async function listPlacementsWithAddress(): Promise<
-  { id: number; name: string; address: string }[]
+  { id: number; name: string; chain: Chain; address: string }[]
 > {
   const db = await getClient();
   const rs = await db.execute(
-    "SELECT id, name, address FROM placements WHERE address IS NOT NULL AND address != '' AND deleted_at IS NULL",
+    "SELECT id, name, chain, address FROM placements WHERE address IS NOT NULL AND address != '' AND deleted_at IS NULL",
   );
   return rs.rows.map((r) => ({
     id: Number(r.id),
     name: String(r.name),
+    chain: (r.chain as Chain | null) ?? "tron",
     address: String(r.address),
   }));
 }
 
 /** Строки свободных средств на биржах — кандидаты на проверку баланса через API биржи. */
 export async function listExchangePlacements(): Promise<
-  { id: number; name: string; exchange: Exchange; exchange_account: ExchangeAccount }[]
+  {
+    id: number;
+    name: string;
+    chain: Chain;
+    exchange: Exchange;
+    exchange_account: ExchangeAccount;
+  }[]
 > {
   const db = await getClient();
   const rs = await db.execute(
-    "SELECT id, name, exchange, exchange_account FROM placements WHERE kind = 'exchange' AND exchange IS NOT NULL AND exchange_account IS NOT NULL AND deleted_at IS NULL",
+    "SELECT id, name, chain, exchange, exchange_account FROM placements WHERE kind = 'exchange' AND exchange IS NOT NULL AND exchange_account IS NOT NULL AND deleted_at IS NULL",
   );
   return rs.rows.map((r) => ({
     id: Number(r.id),
     name: String(r.name),
+    chain: (r.chain as Chain | null) ?? "tron",
     exchange: r.exchange as Exchange,
     exchange_account: r.exchange_account as ExchangeAccount,
   }));
 }
 
-/** Перезаписывает балансы записи (USDT в amount, TRX в trx_amount) из сети или с биржи. */
+/** Перезаписывает балансы записи (USDT в amount, газ в native_amount) из сети или с биржи. */
 export async function updateBalancesFromChain(
   id: number,
   usdtMicro: number,
-  trxMicro: number,
+  nativeMicro: number,
 ): Promise<void> {
   const db = await getClient();
   await db.execute({
-    sql: "UPDATE placements SET amount = ?, trx_amount = ?, chain_checked_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
-    args: [usdtMicro, trxMicro, id],
+    sql: "UPDATE placements SET amount = ?, native_amount = ?, chain_checked_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+    args: [usdtMicro, nativeMicro, id],
   });
 }
 
@@ -662,6 +681,10 @@ export function reorderDebts(ids: number[]): Promise<void> {
 }
 
 // ================= SUMMARY =================
+/** Пустая разбивка по сетям — база, на которую ложатся суммы из GROUP BY. */
+const zeroByChain = (): Record<Chain, number> =>
+  Object.fromEntries(CHAINS.map((c) => [c, 0])) as Record<Chain, number>;
+
 export async function getSummary(): Promise<Summary> {
   const db = await getClient();
   const one = async (table: string, activeOnly = false): Promise<number> => {
@@ -675,48 +698,75 @@ export async function getSummary(): Promise<Summary> {
   const funds = await one("funds");
   const placements = await one("placements", true);
   const debts = await one("debts", true);
-  // TRX информационный, в сверку не входит (SUM пропускает NULL непроверенных строк).
-  const trx = await db.execute(
-    "SELECT COALESCE(SUM(trx_amount), 0) AS s FROM placements WHERE deleted_at IS NULL",
+  // Газ информационный, в сверку не входит (SUM пропускает NULL непроверенных строк).
+  const native = await db.execute(
+    "SELECT chain, COALESCE(SUM(native_amount), 0) AS s FROM placements WHERE deleted_at IS NULL GROUP BY chain",
   );
+  const totalNative = zeroByChain();
+  for (const row of native.rows) {
+    const chain = String(row.chain) as Chain;
+    if (chain in totalNative) totalNative[chain] = fromMicro(Number(row.s));
+  }
   const diff = placements + debts - funds;
   return {
     total_funds: fromMicro(funds),
     total_placements: fromMicro(placements),
     total_debts: fromMicro(debts),
-    total_trx: fromMicro(Number(trx.rows[0].s)),
+    total_native: totalNative,
     diff: fromMicro(diff),
     balanced: diff === 0,
   };
 }
 
-// ================= TRX SNAPSHOTS =================
-const toTrxSnapshot = (r: Row): TrxSnapshot => ({
+// ================= СНИМКИ ГАЗА =================
+const toNativeSnapshot = (r: Row): NativeSnapshot => ({
   date: String(r.date),
-  trx_amount: fromMicro(Number(r.trx_amount)),
+  amount: fromMicro(Number(r.amount)),
 });
 
-/** Апсертит снимок за сегодня (по МСК): сумма trx_amount активных записей. */
-export async function upsertTodayTrxSnapshot(): Promise<void> {
+/** Апсертит снимки за сегодня (по МСК): сумма native_amount активных записей каждой сети. */
+export async function upsertTodayNativeSnapshots(): Promise<void> {
   const db = await getClient();
-  await db.execute(
-    "INSERT INTO trx_snapshots (date, trx_amount) " +
-      "VALUES (date(datetime('now','+3 hours')), (SELECT COALESCE(SUM(trx_amount), 0) FROM placements WHERE deleted_at IS NULL)) " +
-      "ON CONFLICT(date) DO UPDATE SET trx_amount = excluded.trx_amount, updated_at = datetime('now')",
+  await db.batch(
+    CHAINS.map((chain) => ({
+      sql:
+        "INSERT INTO native_snapshots (date, chain, amount) " +
+        "VALUES (date(datetime('now','+3 hours')), ?, " +
+        "(SELECT COALESCE(SUM(native_amount), 0) FROM placements WHERE deleted_at IS NULL AND chain = ?)) " +
+        "ON CONFLICT(date, chain) DO UPDATE SET amount = excluded.amount, updated_at = datetime('now')",
+      args: [chain, chain],
+    })),
+    "write",
   );
 }
 
-/** Снимки за последние N дней (по МСК), по возрастанию даты. */
-export async function listTrxSnapshots(days: number): Promise<TrxSnapshot[]> {
+/** Снимки одной сети за последние N дней (по МСК), по возрастанию даты. */
+export async function listNativeSnapshots(chain: Chain, days: number): Promise<NativeSnapshot[]> {
   const db = await getClient();
   const rs = await db.execute({
-    sql: "SELECT date, trx_amount FROM trx_snapshots WHERE date >= date(datetime('now','+3 hours'), ?) ORDER BY date ASC",
-    args: [`-${days - 1} days`],
+    sql: "SELECT date, amount FROM native_snapshots WHERE chain = ? AND date >= date(datetime('now','+3 hours'), ?) ORDER BY date ASC",
+    args: [chain, `-${days - 1} days`],
   });
-  return rs.rows.map(toTrxSnapshot);
+  return rs.rows.map(toNativeSnapshot);
 }
 
 // ================= DEPO SNAPSHOTS =================
+/** JSON-итоги газа из снимка (micro) -> десятичная разбивка по сетям. */
+function parseTotalNative(value: unknown): Record<Chain, number> {
+  const totals = zeroByChain();
+  if (typeof value !== "string") return totals;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    for (const chain of CHAINS) {
+      const micro = parsed[chain];
+      if (typeof micro === "number") totals[chain] = fromMicro(micro);
+    }
+  } catch {
+    // повреждённый JSON не должен ронять список снимков
+  }
+  return totals;
+}
+
 const toDepoSnapshot = (r: Row): DepoSnapshot => {
   const funds = Number(r.total_funds);
   const placements = Number(r.total_placements);
@@ -728,7 +778,7 @@ const toDepoSnapshot = (r: Row): DepoSnapshot => {
     total_funds: fromMicro(funds),
     total_placements: fromMicro(placements),
     total_debts: fromMicro(debts),
-    total_trx: fromMicro(Number(r.total_trx)),
+    total_native: parseTotalNative(r.total_native),
     diff: fromMicro(diff),
     balanced: diff === 0,
     created_at: String(r.created_at),
@@ -745,19 +795,19 @@ export async function createDepoSnapshot(input: SnapshotInput): Promise<DepoSnap
   ]);
   // Итоги считаем по тем же строкам, что уходят в data, — снимок внутренне согласован.
   const sum = (rows: { amount: number }[]) => rows.reduce((s, r) => s + toMicro(r.amount), 0);
-  const totalTrx = placements.reduce(
-    (s, p) => s + (p.trx_amount === null ? 0 : toMicro(p.trx_amount)),
-    0,
-  );
+  const totalNative = zeroByChain();
+  for (const p of placements) {
+    if (p.native_amount !== null) totalNative[p.chain] += toMicro(p.native_amount);
+  }
   const db = await getClient();
   const rs = await db.execute({
-    sql: "INSERT INTO depo_snapshots (comment, total_funds, total_placements, total_debts, total_trx, data) VALUES (?, ?, ?, ?, ?, ?)",
+    sql: "INSERT INTO depo_snapshots (comment, total_funds, total_placements, total_debts, total_native, data) VALUES (?, ?, ?, ?, ?, ?)",
     args: [
       input.comment,
       sum(funds),
       sum(placements),
       sum(debts),
-      totalTrx,
+      JSON.stringify(totalNative),
       JSON.stringify({ funds, placements, debts }),
     ],
   });
@@ -768,7 +818,7 @@ export async function createDepoSnapshot(input: SnapshotInput): Promise<DepoSnap
 export async function listDepoSnapshots(): Promise<DepoSnapshot[]> {
   const db = await getClient();
   const rs = await db.execute(
-    "SELECT id, comment, total_funds, total_placements, total_debts, total_trx, created_at FROM depo_snapshots ORDER BY id DESC",
+    "SELECT id, comment, total_funds, total_placements, total_debts, total_native, created_at FROM depo_snapshots ORDER BY id DESC",
   );
   return rs.rows.map(toDepoSnapshot);
 }
@@ -783,7 +833,17 @@ export async function getDepoSnapshot(id: number): Promise<DepoSnapshotDetail | 
     DepoSnapshotDetail,
     "funds" | "placements" | "debts"
   >;
-  return { ...toDepoSnapshot(row), ...data };
+  // Снимки, снятые до поддержки нескольких сетей: у записей нет chain, а
+  // нативный баланс лежал в trx_amount. Достраиваем, чтобы старые снимки открывались.
+  const placements = data.placements.map((p) => {
+    const legacy = p as Placement & { trx_amount?: number | null };
+    return {
+      ...p,
+      chain: p.chain ?? "tron",
+      native_amount: p.native_amount ?? legacy.trx_amount ?? null,
+    };
+  });
+  return { ...toDepoSnapshot(row), ...data, placements };
 }
 
 /** Снимки удаляются жёстко: это независимые копии, архив им не нужен. */

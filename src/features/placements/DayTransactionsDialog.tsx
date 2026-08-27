@@ -147,6 +147,7 @@ export function DayTransactionsDialog({
                   {data.transfers.map((t) => (
                     <TransferRow
                       key={`${t.placement_id}:${t.tx_id}:${t.from}:${t.to}:${t.amount}`}
+                      chain={t.chain}
                       transfer={t}
                       walletName={t.placement_name}
                       showDate={false}

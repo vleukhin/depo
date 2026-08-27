@@ -21,7 +21,7 @@ const pctFmt = new Intl.NumberFormat("ru-RU", {
   maximumFractionDigits: 1,
 });
 
-/** Тултип сегмента: название + сумма USDT. Единый язык со SnapshotTooltip графика TRX. */
+/** Тултип сегмента: название + сумма USDT. Единый язык со SnapshotTooltip графика газа. */
 function StructureTooltip({
   active,
   payload,

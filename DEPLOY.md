@@ -77,12 +77,14 @@ git push origin master
    | `AUTH_SECRET` | случайная строка (`openssl rand -hex 32`) |
    | `TURSO_DATABASE_URL` | из шага 1 (`libsql://…`) |
    | `TURSO_AUTH_TOKEN` | из шага 1 |
-   | `TRONGRID_API_KEY` | ключ TronGrid (опционально) |
+   | `TRONGRID_API_KEY` | ключ TronGrid для сети TRON (опционально) |
+   | `BSC_RPC_URL` / `ETH_RPC_URL` | опционально — свои RPC для BSC/Ethereum (по умолчанию публичные ноды) |
+   | `ETHERSCAN_API_KEY` | ключ Etherscan API v2 (один на все EVM-сети) — нужен только для истории переводов в BSC/Ethereum |
    | `KUCOIN_API_KEY` / `KUCOIN_API_SECRET` / `KUCOIN_API_PASSPHRASE` | read-only ключ KuCoin |
-   | `BITGET_API_KEY` / `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` | ключ Bitget (read-only; для вывода TRX — с правом Withdraw) |
+   | `BITGET_API_KEY` / `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` | ключ Bitget (read-only; для вывода газа — с правом Withdraw) |
    | `EXCHANGE_PROXY_URL` | опционально — прокси со статическим IP для бирж (см. «Статический IP…» ниже) |
    | `EXCHANGE_PROXY_CA` / `EXCHANGE_PROXY_SERVERNAME` | опционально — для HTTPS-прокси с самоподписанным сертификатом |
-   | `CRON_SECRET` | случайная строка (`openssl rand -hex 32`) — авторизация ежедневного снимка TRX (см. «Ежедневный снимок TRX» ниже) |
+   | `CRON_SECRET` | случайная строка (`openssl rand -hex 32`) — авторизация ежедневного снимка (см. «Ежедневный снимок депо и газа» ниже) |
    | `EXTERNAL_API_TOKEN` | опционально — токен внешнего API `GET /api/funds/balance?name=…` (`Authorization: Bearer <токен>`). Не задан — эндпоинт закрыт |
 
    Значения берите из вашего локального `.env`. **Вводите их только в интерфейсе Vercel**
@@ -99,11 +101,11 @@ KuCoin недоступен из США, а Vercel по умолчанию вы�
 блокировки. На плане Hobby регион один для всех функций; сменить можно, отредактировав файл
 (или в Settings → Functions → Function Region) и передеплоив.
 
-## Ежедневный снимок депо и TRX (Vercel Cron)
+## Ежедневный снимок депо и газа (Vercel Cron)
 
 Раз в сутки крон вызывает `GET /api/cron/snapshot`: эндпоинт обновляет балансы всех
-свободных средств из сети/с бирж (как кнопка «Проверить балансы»), сохраняет суммарный TRX
-за день в таблицу `trx_snapshots` (по ней строится график «Динамика TRX» на главной)
+свободных средств из сетей/с бирж (как кнопка «Проверить балансы»), сохраняет суммарный газ
+каждой сети за день в таблицу `native_snapshots` (по ней строится график «Динамика газа» на главной)
 и создаёт снимок депо с комментарием «Автоснимок» — он виден на странице `/snapshots`
 наравне с созданными вручную.
 
@@ -156,12 +158,12 @@ KuCoin недоступен из США, а Vercel по умолчанию вы�
 У serverless-функций Vercel **нет фиксированного исходящего IP** — он меняется между
 вызовами, деплоями и регионами, поэтому «узнать IP и вписать в whitelist ключа» не выйдет.
 Для read-only проверки балансов проще всего **не ставить** IP-ограничение на ключ. Но
-право **Withdraw** на ключе Bitget (нужно для вывода TRX на кошельки из приложения)
+право **Withdraw** на ключе Bitget (нужно для вывода газа на кошельки из приложения)
 IP-allowlist требует. Тогда пускайте биржевые запросы через свой HTTP-прокси со
 статическим IP и вписывайте IP прокси в whitelist ключа.
 
 Приложение это уже поддерживает: задайте `EXCHANGE_PROXY_URL` — и **только** запросы к
-Bitget/KuCoin пойдут через прокси (TronGrid, Telegram и БД Turso — напрямую, чтобы не
+Bitget/KuCoin пойдут через прокси (TronGrid, EVM-RPC, Etherscan, Telegram и БД Turso — напрямую, чтобы не
 зависеть от аптайма прокси). Не задан — обычный прямой fetch (режим локальной разработки).
 
 Через прокси идут **подписанные** запросы с вашим API-ключом (в т.ч. с правом Withdraw),
@@ -253,7 +255,7 @@ curl --proxy https://depo:ПАРОЛЬ@depo-proxy:8443 \
 | `EXCHANGE_PROXY_SERVERNAME` | `depo-proxy` (DNS-метка из SAN сертификата) |
 
 Передеплойте. Затем впишите **IP_ВПС** в whitelist ключа Bitget (для ключа с правом
-Withdraw) и проверьте выводом малой суммы через `withdraw-trx`.
+Withdraw) и проверьте выводом малой суммы через `withdraw-gas`.
 
 > **Проще, если есть домен.** Направьте A-запись (напр. `proxy.ваш-домен`) на IP VPS,
 > получите сертификат Let's Encrypt (`certbot`) — тогда `EXCHANGE_PROXY_CA` и

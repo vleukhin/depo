@@ -60,10 +60,10 @@ import { AddressCell } from "@/components/AddressCell";
 import { DeleteButton } from "@/components/DeleteButton";
 import { SortableCard, SortableRow, SortableRows } from "@/components/SortableRows";
 import { UsdtAmount } from "@/components/UsdtAmount";
-import { TrxAmount } from "@/components/TrxAmount";
+import { GasAmount } from "@/components/GasAmount";
 import { PlacementIcon } from "@/components/PlacementIcon";
 import { CompactTagList, TagBadge, TagDot, TagToggle } from "@/components/TagBadge";
-import { isTronAddress } from "@/lib/tron";
+import { CHAIN_META, isChainAddress } from "@/lib/chains";
 import { cn } from "@/lib/utils";
 import {
   useCheckBalances,
@@ -75,7 +75,7 @@ import { useTags } from "@/hooks/useTags";
 import { useStoredBoolean } from "@/hooks/useStoredBoolean";
 import type { Placement } from "@/types";
 import { ACCOUNT_LABELS, PlacementForm } from "./PlacementForm";
-import { TrxTopUpDialog } from "./TrxTopUpDialog";
+import { GasTopUpDialog } from "./GasTopUpDialog";
 import { TransactionsDialog } from "./TransactionsDialog";
 import { PlacementsSummaryDialog } from "./PlacementsSummaryDialog";
 import { DayTransactionsDialog } from "./DayTransactionsDialog";
@@ -88,7 +88,9 @@ function placementLocation(p: Placement): string {
   if (p.kind === "exchange" && p.exchange && p.exchange_account) {
     return `${p.exchange} · ${ACCOUNT_LABELS[p.exchange_account]}`;
   }
-  if (p.address) return `${p.address.slice(0, 6)}…${p.address.slice(-4)}`;
+  if (p.address) {
+    return `${CHAIN_META[p.chain].label} · ${p.address.slice(0, 6)}…${p.address.slice(-4)}`;
+  }
   return "—";
 }
 
@@ -166,7 +168,7 @@ export function PlacementsSection() {
             .join(", ")})`,
         );
       } else if (res.checked === 0) {
-        toast.info("Нет строк с TRON-адресами или биржевыми счетами для проверки");
+        toast.info("Нет строк с адресами кошельков или биржевыми счетами для проверки");
       } else {
         toast.success(`Балансы обновлены (строк: ${res.checked})`);
       }
@@ -397,7 +399,7 @@ export function PlacementsSection() {
                 <TableHead>Название</TableHead>
                 <TableHead>Теги</TableHead>
                 <TableHead className="text-right">Сумма</TableHead>
-                <TableHead className="text-right">TRX</TableHead>
+                <TableHead className="text-right">Газ</TableHead>
                 <TableHead>Адрес / счёт</TableHead>
                 <TableHead>Комментарий</TableHead>
                 <TableHead className="w-32" />
@@ -444,14 +446,16 @@ export function PlacementsSection() {
                     }
                   >
                     <span className="inline-flex items-center justify-end gap-1">
-                      {p.trx_amount != null && <TrxAmount value={p.trx_amount} />}
-                      {p.kind === "wallet" && isTronAddress(p.address) ? (
+                      {p.native_amount != null && (
+                        <GasAmount chain={p.chain} value={p.native_amount} />
+                      )}
+                      {p.kind === "wallet" && isChainAddress(p.chain, p.address) ? (
                         <Button
                           variant="ghost"
                           size="icon"
                           className="size-6"
-                          aria-label="Пополнить TRX"
-                          title="Пополнить TRX с биржи"
+                          aria-label={`Пополнить ${CHAIN_META[p.chain].native}`}
+                          title={`Пополнить ${CHAIN_META[p.chain].native} с биржи`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setTopUp(p);
@@ -472,14 +476,14 @@ export function PlacementsSection() {
                         {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
                       </span>
                     ) : (
-                      <AddressCell address={p.address} />
+                      <AddressCell chain={p.chain} address={p.address} />
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
                     {p.comment}
                   </TableCell>
                   <TableCell className="text-right">
-                    {p.kind === "wallet" && isTronAddress(p.address) && (
+                    {p.kind === "wallet" && isChainAddress(p.chain, p.address) && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -545,10 +549,10 @@ export function PlacementsSection() {
                   </div>
                   <span className="flex w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="min-w-0 truncate">{placementLocation(p)}</span>
-                    {p.trx_amount != null && (
+                    {p.native_amount != null && (
                       <span className="flex shrink-0 items-center gap-1">
                         <span aria-hidden>·</span>
-                        <TrxAmount value={p.trx_amount} iconClassName="size-3" />
+                        <GasAmount chain={p.chain} value={p.native_amount} iconClassName="size-3" />
                       </span>
                     )}
                   </span>
@@ -586,7 +590,7 @@ export function PlacementsSection() {
                         Копировать адрес
                       </DropdownMenuItem>
                     )}
-                    {p.kind === "wallet" && isTronAddress(p.address) && (
+                    {p.kind === "wallet" && isChainAddress(p.chain, p.address) && (
                       <>
                         <DropdownMenuItem onSelect={() => setTxFor(p)}>
                           <History />
@@ -594,7 +598,7 @@ export function PlacementsSection() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => setTopUp(p)}>
                           <Plus />
-                          Пополнить TRX
+                          Пополнить {CHAIN_META[p.chain].native}
                         </DropdownMenuItem>
                       </>
                     )}
@@ -642,7 +646,7 @@ export function PlacementsSection() {
       </AlertDialog>
 
       {topUp && (
-        <TrxTopUpDialog
+        <GasTopUpDialog
           key={topUp.id}
           placement={topUp}
           open

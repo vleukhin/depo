@@ -1,50 +1,63 @@
+import { CHAIN_META, isChainAddress, isEvmChain } from "@/lib/chains";
 import {
   listExchangePlacements,
   listPlacementsWithAddress,
   updateBalancesFromChain,
-  upsertTodayTrxSnapshot,
+  upsertTodayNativeSnapshots,
 } from "@/lib/repo";
-import { fetchTrxBalance, fetchUsdtBalance, isTronAddress } from "@/lib/tron";
-import {
-  fetchTrxBalanceMicro as fetchKucoinTrx,
-  fetchUsdtBalanceMicro as fetchKucoinUsdt,
-} from "@/lib/kucoin";
-import {
-  fetchTrxBalanceMicro as fetchBitgetTrx,
-  fetchUsdtBalanceMicro as fetchBitgetUsdt,
-} from "@/lib/bitget";
-import type { CheckBalancesResult, Exchange, ExchangeAccount } from "@/types";
+import { fetchTrxBalance, fetchUsdtBalance as fetchTronUsdtBalance } from "@/lib/tron";
+import { fetchNativeBalance, fetchUsdtBalance as fetchEvmUsdtBalance } from "@/lib/evm";
+import { fetchCoinBalanceMicro as fetchKucoinCoin } from "@/lib/kucoin";
+import { fetchCoinBalanceMicro as fetchBitgetCoin } from "@/lib/bitget";
+import type { Chain, CheckBalancesResult, Exchange, ExchangeAccount } from "@/types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-type ExchangeFetcher = (account: ExchangeAccount) => Promise<number>;
-const USDT_FETCHERS: Record<Exchange, ExchangeFetcher> = {
-  KuCoin: fetchKucoinUsdt,
-  Bitget: fetchBitgetUsdt,
-};
-const TRX_FETCHERS: Record<Exchange, ExchangeFetcher> = {
-  KuCoin: fetchKucoinTrx,
-  Bitget: fetchBitgetTrx,
+type ExchangeFetcher = (coin: string, account: ExchangeAccount) => Promise<number>;
+const EXCHANGE_FETCHERS: Record<Exchange, ExchangeFetcher> = {
+  KuCoin: fetchKucoinCoin,
+  Bitget: fetchBitgetCoin,
 };
 
 /**
- * Обновляет балансы всех записей из сети/с бирж и апсертит снимок
- * суммарного TRX за сегодня. Общая логика ручной проверки (кнопка в UI)
- * и ежедневного крона (/api/cron/snapshot).
+ * Балансы кошелька в его сети: USDT (идёт в amount) и нативная монета
+ * («газ», идёт в native_amount), обе в micro-единицах.
+ */
+function fetchWalletBalances(
+  chain: Chain,
+  address: string,
+): Promise<[usdt: number, native: number]> {
+  return isEvmChain(chain)
+    ? Promise.all([fetchEvmUsdtBalance(chain, address), fetchNativeBalance(chain, address)])
+    : Promise.all([fetchTronUsdtBalance(address), fetchTrxBalance(address)]);
+}
+
+/**
+ * Пауза между кошельками: у TronGrid без ключа жёсткий лимит, публичные
+ * EVM-ноды такого не требуют.
+ */
+function walletPause(chain: Chain): number {
+  if (isEvmChain(chain)) return 100;
+  return process.env.TRONGRID_API_KEY ? 100 : 600;
+}
+
+/**
+ * Обновляет балансы всех записей из сети/с бирж и апсертит снимки суммарного
+ * газа за сегодня. Общая логика ручной проверки (кнопка в UI) и ежедневного
+ * крона (/api/cron/snapshot).
  */
 export async function checkAllBalances(): Promise<CheckBalancesResult> {
   const result: CheckBalancesResult = { checked: 0, failed: [], skipped: 0 };
 
-  // Кошельки: балансы USDT (TRC-20) и нативного TRX по адресу через TronGrid.
-  for (const { id, name, address } of await listPlacementsWithAddress()) {
-    if (!isTronAddress(address)) {
+  // Кошельки: USDT и нативная монета по адресу — TronGrid либо EVM-RPC.
+  for (const { id, name, chain, address } of await listPlacementsWithAddress()) {
+    if (!isChainAddress(chain, address)) {
       result.skipped++;
       continue;
     }
     try {
-      const usdt = await fetchUsdtBalance(address);
-      const trx = await fetchTrxBalance(address);
-      await updateBalancesFromChain(id, usdt, trx);
+      const [usdt, native] = await fetchWalletBalances(chain, address);
+      await updateBalancesFromChain(id, usdt, native);
       result.checked++;
     } catch (err) {
       result.failed.push({
@@ -53,16 +66,16 @@ export async function checkAllBalances(): Promise<CheckBalancesResult> {
         error: err instanceof Error ? err.message : "Ошибка запроса",
       });
     }
-    // с API-ключом лимиты TronGrid заметно выше — пауза меньше
-    await sleep(process.env.TRONGRID_API_KEY ? 100 : 600);
+    await sleep(walletPause(chain));
   }
 
-  // Биржи: балансы USDT и TRX на счёте через приватный API (KuCoin/Bitget).
-  for (const { id, name, exchange, exchange_account } of await listExchangePlacements()) {
+  // Биржи: USDT и нативная монета сети записи через приватный API (KuCoin/Bitget).
+  for (const { id, name, chain, exchange, exchange_account } of await listExchangePlacements()) {
     try {
-      const usdt = await USDT_FETCHERS[exchange](exchange_account);
-      const trx = await TRX_FETCHERS[exchange](exchange_account);
-      await updateBalancesFromChain(id, usdt, trx);
+      const fetchCoin = EXCHANGE_FETCHERS[exchange];
+      const usdt = await fetchCoin("USDT", exchange_account);
+      const native = await fetchCoin(CHAIN_META[chain].native, exchange_account);
+      await updateBalancesFromChain(id, usdt, native);
       result.checked++;
     } catch (err) {
       result.failed.push({
@@ -74,7 +87,7 @@ export async function checkAllBalances(): Promise<CheckBalancesResult> {
     await sleep(250);
   }
 
-  await upsertTodayTrxSnapshot();
+  await upsertTodayNativeSnapshots();
 
   return result;
 }

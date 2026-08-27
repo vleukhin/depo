@@ -7,14 +7,12 @@
 // контракте и не зависят от активации аккаунта.
 
 import { createHash } from "node:crypto";
-import type { Trc20Transfer, Trc20TransfersPage } from "@/types";
+import { CHAIN_META } from "@/lib/chains";
+import type { UsdtTransfer, UsdtTransfersPage } from "@/types";
 
-export const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
-const TRON_ADDRESS_RE = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
-
-export function isTronAddress(value: string | null | undefined): value is string {
-  return !!value && TRON_ADDRESS_RE.test(value.trim());
-}
+// Модуль серверный (node:crypto для base58check). Проверка формата адреса
+// живёт в @/lib/chains — её импортируют и клиентские компоненты.
+const USDT_CONTRACT = CHAIN_META.tron.usdtContract;
 
 // --- base58check-декодирование TRON-адреса в 20-байтовый hex ---
 
@@ -129,7 +127,7 @@ export async function fetchUsdtBalance(address: string): Promise<number> {
   return Number(micro);
 }
 
-interface Trc20TransferRow {
+interface TronTransferRow {
   transaction_id?: string;
   block_timestamp?: number;
   from?: string;
@@ -138,15 +136,15 @@ interface Trc20TransferRow {
   token_info?: { symbol?: string; decimals?: number };
 }
 
-interface Trc20TransfersResponse {
-  data?: Trc20TransferRow[];
+interface TronTransfersResponse {
+  data?: TronTransferRow[];
   success?: boolean;
   // Курсор следующей страницы; на последней странице TronGrid его не отдаёт.
   meta?: { fingerprint?: string };
 }
 
 /** Строка base-units + число знаков токена -> десятичное число (без потери точности на больших суммах). */
-function transferValueToDecimal(value: string, decimals: number): number {
+export function transferValueToDecimal(value: string, decimals: number): number {
   const base = BigInt(value);
   const divisor = 10n ** BigInt(decimals);
   const whole = base / divisor;
@@ -155,7 +153,7 @@ function transferValueToDecimal(value: string, decimals: number): number {
   return Number(whole) + Number(frac) / Number(divisor);
 }
 
-export interface Trc20TransfersQuery {
+export interface TronTransfersQuery {
   limit?: number; // 10 по умолчанию; потолок TronGrid — 200
   fingerprint?: string; // курсор из meta.fingerprint предыдущей страницы
   minTimestamp?: number; // мс от эпохи, включительно
@@ -169,8 +167,8 @@ export interface Trc20TransfersQuery {
  */
 export async function fetchUsdtTransfers(
   address: string,
-  query: Trc20TransfersQuery = {},
-): Promise<Trc20TransfersPage> {
+  query: TronTransfersQuery = {},
+): Promise<UsdtTransfersPage> {
   const addr = address.trim();
   const params = new URLSearchParams({
     limit: String(query.limit ?? 10),
@@ -182,7 +180,7 @@ export async function fetchUsdtTransfers(
   if (query.maxTimestamp !== undefined) params.set("max_timestamp", String(query.maxTimestamp));
   if (query.orderBy) params.set("order_by", `block_timestamp,${query.orderBy}`);
 
-  const data = await tronFetch<Trc20TransfersResponse>(
+  const data = await tronFetch<TronTransfersResponse>(
     `/v1/accounts/${addr}/transactions/trc20?${params}`,
   );
   const rows = data.data ?? [];
@@ -200,7 +198,7 @@ export async function fetchUsdtTransfers(
         symbol: r.token_info?.symbol ?? "USDT",
         timestamp: r.block_timestamp ?? 0,
         direction: (r.from as string).toLowerCase() === lower ? "out" : "in",
-      } satisfies Trc20Transfer;
+      } satisfies UsdtTransfer;
     });
 
   return { transfers, next: data.meta?.fingerprint ?? null };
@@ -216,11 +214,11 @@ export async function fetchUsdtTransfersInRange(
   from: number,
   to: number,
   opts: { pageLimit?: number; maxPages?: number } = {},
-): Promise<{ transfers: Trc20Transfer[]; truncated: boolean }> {
+): Promise<{ transfers: UsdtTransfer[]; truncated: boolean }> {
   const pageLimit = opts.pageLimit ?? 200;
   const maxPages = opts.maxPages ?? 3;
 
-  const transfers: Trc20Transfer[] = [];
+  const transfers: UsdtTransfer[] = [];
   let fingerprint: string | undefined;
   for (let page = 0; page < maxPages; page++) {
     const res = await fetchUsdtTransfers(address, {

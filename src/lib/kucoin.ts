@@ -142,7 +142,10 @@ const ACCOUNT_TYPES: Record<"spot" | "main", KucoinAccountType[]> = {
  * потому что API принимает лишь один type, а для "spot" нужны два.
  * Если подходящих счетов нет — 0.
  */
-async function fetchCoinBalanceMicro(coin: string, account: "spot" | "main"): Promise<number> {
+export async function fetchCoinBalanceMicro(
+  coin: string,
+  account: "spot" | "main",
+): Promise<number> {
   const types = ACCOUNT_TYPES[account];
   const accounts = await fetchAccounts({ currency: coin });
   return accounts
@@ -153,12 +156,4 @@ async function fetchCoinBalanceMicro(coin: string, account: "spot" | "main"): Pr
 /** Суммарный баланс USDT на счёте указанного типа в целых micro-USDT (USDT × 1 000 000). */
 export function fetchUsdtBalanceMicro(account: "spot" | "main"): Promise<number> {
   return fetchCoinBalanceMicro("USDT", account);
-}
-
-/**
- * Суммарный баланс TRX на счёте указанного типа в целых micro-TRX (TRX × 1 000 000).
- * У TRX 6 знаков после запятой — та же точность, что у USDT.
- */
-export function fetchTrxBalanceMicro(account: "spot" | "main"): Promise<number> {
-  return fetchCoinBalanceMicro("TRX", account);
 }

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { AddressCell } from "@/components/AddressCell";
 import { UsdtAmount } from "@/components/UsdtAmount";
-import { TrxAmount } from "@/components/TrxAmount";
+import { GasAmount, GasTotals } from "@/components/GasAmount";
 import { Badge } from "@/components/ui/badge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { ReconciliationPill } from "@/components/ReconciliationPill";
@@ -85,10 +85,10 @@ export function SnapshotView({ id }: { id: number }) {
             iconClassName="size-5"
           />
         </StatTile>
-        <StatTile label="Всего TRX">
-          <TrxAmount
-            value={snapshot.total_trx}
-            className="text-2xl font-semibold tracking-tight"
+        <StatTile label="Газ">
+          <GasTotals
+            totals={snapshot.total_native}
+            className="justify-start text-2xl font-semibold tracking-tight"
             iconClassName="size-5"
           />
         </StatTile>
@@ -141,7 +141,7 @@ export function SnapshotView({ id }: { id: number }) {
                   <TableHead>Название</TableHead>
                   <TableHead>Адрес / счёт</TableHead>
                   <TableHead className="text-right">Сумма</TableHead>
-                  <TableHead className="text-right">TRX</TableHead>
+                  <TableHead className="text-right">Газ</TableHead>
                   <TableHead>Комментарий</TableHead>
                 </TableRow>
               </TableHeader>
@@ -155,14 +155,16 @@ export function SnapshotView({ id }: { id: number }) {
                           {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
                         </span>
                       ) : (
-                        <AddressCell address={p.address} />
+                        <AddressCell chain={p.chain} address={p.address} />
                       )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       <UsdtAmount value={p.amount} />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {p.trx_amount !== null && <TrxAmount value={p.trx_amount} />}
+                      {p.native_amount !== null && (
+                        <GasAmount chain={p.chain} value={p.native_amount} />
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground max-w-48 truncate">
                       {p.comment}

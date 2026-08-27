@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { EXCHANGE_ACCOUNTS, EXCHANGES, PLACEMENT_ICONS, SERVICES, TAG_COLORS } from "@/types";
+import { CHAIN_META, isChainAddress } from "@/lib/chains";
+import {
+  CHAINS,
+  EXCHANGE_ACCOUNTS,
+  EXCHANGES,
+  PLACEMENT_ICONS,
+  SERVICES,
+  TAG_COLORS,
+} from "@/types";
 
 // Суммы приходят с клиента в десятичных USDT (валидное число; форма шлёт number).
 const amount = z
@@ -36,6 +44,9 @@ export const placementInput = z
     kind: z
       .enum(["wallet", "exchange"], { message: "Некорректный тип хранения" })
       .default("wallet"),
+    // Сеть: для кошелька задаёт формат адреса и источник баланса,
+    // для биржи — какую нативную монету («газ») показывать и выводить.
+    chain: z.enum(CHAINS, { message: "Некорректная сеть" }).default("tron"),
     address: optionalText,
     exchange: z
       .enum(EXCHANGES, { message: "Некорректная биржа" })
@@ -62,6 +73,15 @@ export const placementInput = z
       if (!v.exchange_account) {
         ctx.addIssue({ code: "custom", path: ["exchange_account"], message: "Выберите тип счёта" });
       }
+    }
+    // Адрес необязателен, но заполненный обязан подходить выбранной сети:
+    // иначе строка молча выпадет из проверки балансов.
+    if (v.kind === "wallet" && v.address && !isChainAddress(v.chain, v.address)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["address"],
+        message: `Некорректный адрес для сети ${CHAIN_META[v.chain].label}`,
+      });
     }
   })
   // Поля неактивной ветки обнуляются, чтобы в БД не оседали противоречивые значения.
@@ -101,10 +121,10 @@ export const reorderInput = z.object({
   ids: z.array(z.number().int().positive()).min(1),
 });
 
-// Ввод для вывода TRX с биржи на адрес кошелька. Адрес получателя сервер берёт
-// из сохранённой записи по placementId — клиент шлёт только его id. Счёт-
+// Ввод для вывода газа с биржи на адрес кошелька. Адрес получателя и сеть сервер
+// берёт из сохранённой записи по placementId — клиент шлёт только его id. Счёт-
 // источник фиксирован (spot), поэтому в схему не выносится.
-export const trxWithdrawInput = z.object({
+export const gasWithdrawInput = z.object({
   placementId: z.number({ message: "Некорректная запись" }).int().positive(),
   exchange: z.enum(EXCHANGES, { message: "Некорректная биржа" }),
   amount: z.number({ message: "Укажите сумму" }).positive("Сумма должна быть больше нуля"),
@@ -130,7 +150,7 @@ export type TagInput = z.infer<typeof tagInput>;
 export type PlacementInput = z.infer<typeof placementInput>;
 export type DebtInput = z.infer<typeof debtInput>;
 export type SnapshotInput = z.infer<typeof snapshotInput>;
-export type TrxWithdrawInput = z.infer<typeof trxWithdrawInput>;
+export type GasWithdrawInput = z.infer<typeof gasWithdrawInput>;
 export type ParsedRequestOutput = z.infer<typeof parsedRequest>;
 
 // input-типы для react-hook-form (до zod-трансформаций).

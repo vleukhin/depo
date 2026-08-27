@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { UsdtIcon } from "@/components/UsdtAmount";
+import { CHAIN_META, explorerAddressUrl, explorerTxUrl } from "@/lib/chains";
 import { formatMskTime } from "@/lib/format";
-import type { Trc20Transfer, WalletTransfer } from "@/types";
+import type { Chain, UsdtTransfer, WalletTransfer } from "@/types";
 
 // Точные суммы переводов (в отличие от целочисленных сумм в таблицах).
 const amountFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
@@ -27,12 +28,14 @@ function shortAddress(value: string): string {
  * там же дата уже в заголовке — поэтому время можно сократить до «ЧЧ:ММ» по МСК.
  */
 export function TransferRow({
+  chain,
   transfer,
   onCreateDebt,
   walletName,
   showDate = true,
 }: {
-  transfer: Trc20Transfer | WalletTransfer;
+  chain: Chain;
+  transfer: UsdtTransfer | WalletTransfer;
   onCreateDebt: () => void;
   walletName?: string;
   showDate?: boolean;
@@ -40,6 +43,7 @@ export function TransferRow({
   const out = transfer.direction === "out";
   const counterparty = out ? transfer.to : transfer.from;
   const internalWith = (transfer as WalletTransfer).internal_with;
+  const explorer = CHAIN_META[chain].explorerName;
   return (
     <li className="flex items-center gap-3 py-2.5">
       <span
@@ -75,11 +79,11 @@ export function TransferRow({
           )}
           <span>{out ? "кому" : "от"}</span>
           <a
-            href={`https://tronscan.org/#/address/${counterparty}`}
+            href={explorerAddressUrl(chain, counterparty)}
             target="_blank"
             rel="noopener noreferrer"
             className="font-mono hover:text-foreground hover:underline underline-offset-2"
-            title="Открыть адрес в Tronscan"
+            title={`Открыть адрес в ${explorer}`}
           >
             {shortAddress(counterparty)}
           </a>
@@ -95,12 +99,12 @@ export function TransferRow({
       </div>
 
       <a
-        href={`https://tronscan.org/#/transaction/${transfer.tx_id}`}
+        href={explorerTxUrl(chain, transfer.tx_id)}
         target="_blank"
         rel="noopener noreferrer"
         className="text-muted-foreground hover:text-foreground"
-        title="Транзакция в Tronscan"
-        aria-label="Транзакция в Tronscan"
+        title={`Транзакция в ${explorer}`}
+        aria-label={`Транзакция в ${explorer}`}
       >
         <ExternalLink className="size-4" />
       </a>

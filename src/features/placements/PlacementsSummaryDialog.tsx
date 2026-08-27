@@ -9,10 +9,10 @@ import {
 } from "@/components/ui/dialog";
 import { PlacementIcon, PLACEMENT_ICON_META } from "@/components/PlacementIcon";
 import { UsdtAmount } from "@/components/UsdtAmount";
-import { TrxAmount } from "@/components/TrxAmount";
-import type { Placement, PlacementIconId } from "@/types";
+import { GasAmount } from "@/components/GasAmount";
+import { CHAINS, type Chain, type Placement, type PlacementIconId } from "@/types";
 
-// Числовые колонки (доля, TRX, сумма) выровнены по общей ширине — и в строках,
+// Числовые колонки (доля, газ, сумма) выровнены по общей ширине — и в строках,
 // и в плашке «Итого». min-w вместо w у сумм: обычные значения стоят в колонку,
 // а аномально длинное не обрежется.
 
@@ -20,25 +20,32 @@ import type { Placement, PlacementIconId } from "@/types";
 type PlatformRow = {
   icon: PlacementIconId | null; // null — записи без иконки
   amount: number; // сумма USDT
-  trx: number; // сумма TRX
+  gas: Record<Chain, number>; // газ по сетям: в одну платформу могут попасть записи разных сетей
   count: number;
 };
+
+const zeroGas = (): Record<Chain, number> =>
+  Object.fromEntries(CHAINS.map((c) => [c, 0])) as Record<Chain, number>;
+
+/** Ненулевые балансы газа — то, что реально показывается в строке. */
+const gasEntries = (gas: Record<Chain, number>) =>
+  CHAINS.filter((c) => gas[c] > 0).map((c) => [c, gas[c]] as const);
 
 /** Суммы по платформам: группировка активных записей по иконке. */
 function groupByIcon(placements: Placement[]) {
   const map = new Map<PlacementIconId | "__none__", PlatformRow>();
   let total = 0;
-  let totalTrx = 0;
+  const totalGas = zeroGas();
 
   for (const p of placements) {
     const key = p.icon ?? "__none__";
-    const row = map.get(key) ?? { icon: p.icon, amount: 0, trx: 0, count: 0 };
+    const row = map.get(key) ?? { icon: p.icon, amount: 0, gas: zeroGas(), count: 0 };
     row.amount += p.amount;
-    row.trx += p.trx_amount ?? 0;
+    row.gas[p.chain] += p.native_amount ?? 0;
     row.count += 1;
     map.set(key, row);
     total += p.amount;
-    totalTrx += p.trx_amount ?? 0;
+    totalGas[p.chain] += p.native_amount ?? 0;
   }
 
   // Крупные платформы сверху; «Без иконки» — всегда последней строкой.
@@ -48,7 +55,28 @@ function groupByIcon(placements: Placement[]) {
     return b.amount - a.amount;
   });
 
-  return { rows, total, totalTrx, count: placements.length };
+  return { rows, total, totalGas, count: placements.length };
+}
+
+/**
+ * Колонка газа: по строке на сеть с ненулевым балансом. Ширина фиксирована,
+ * пустой блок остаётся на месте — иначе суммы съезжают по строкам.
+ */
+function GasColumn({ gas }: { gas: Record<Chain, number> }) {
+  const entries = gasEntries(gas);
+  if (entries.length === 0) return <span className="min-w-16 shrink-0" />;
+  return (
+    <span className="flex min-w-16 shrink-0 flex-col items-end">
+      {entries.map(([chain, value]) => (
+        <GasAmount
+          key={chain}
+          chain={chain}
+          value={value}
+          className="text-xs text-muted-foreground"
+        />
+      ))}
+    </span>
+  );
 }
 
 export function PlacementsSummaryDialog({
@@ -60,7 +88,7 @@ export function PlacementsSummaryDialog({
   onOpenChange: (open: boolean) => void;
   placements: Placement[];
 }) {
-  const { rows, total, totalTrx, count } = useMemo(
+  const { rows, total, totalGas, count } = useMemo(
     () => groupByIcon(placements),
     [placements],
   );
@@ -91,14 +119,7 @@ export function PlacementsSummaryDialog({
               </span>
               {/* Пустая колонка доли — чтобы «Итого» стояло в тех же колонках, что строки ниже. */}
               <span className="w-9 shrink-0" />
-              {totalTrx > 0 ? (
-                <TrxAmount
-                  value={totalTrx}
-                  className="min-w-16 shrink-0 justify-end text-xs text-muted-foreground"
-                />
-              ) : (
-                <span className="min-w-16 shrink-0" />
-              )}
+              <GasColumn gas={totalGas} />
               <UsdtAmount
                 value={total}
                 className="min-w-20 shrink-0 justify-end font-semibold sm:min-w-24"
@@ -132,15 +153,7 @@ export function PlacementsSummaryDialog({
                     <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                       {total > 0 ? `${Math.round((row.amount / total) * 100)}%` : "—"}
                     </span>
-                    {/* Пустой блок вместо нулевого TRX — чтобы суммы не съезжали по строкам. */}
-                    {row.trx > 0 ? (
-                      <TrxAmount
-                        value={row.trx}
-                        className="min-w-16 shrink-0 justify-end text-xs text-muted-foreground"
-                      />
-                    ) : (
-                      <span className="min-w-16 shrink-0" />
-                    )}
+                    <GasColumn gas={row.gas} />
                     <UsdtAmount
                       value={row.amount}
                       className="min-w-20 shrink-0 justify-end font-medium sm:min-w-24"

@@ -1,7 +1,8 @@
 "use client";
 
 import { CopyButton } from "@/components/CopyButton";
-import { isTronAddress } from "@/lib/tron";
+import { CHAIN_META, explorerAddressUrl, isChainAddress } from "@/lib/chains";
+import type { Chain } from "@/types";
 
 // Адрес целиком; первые и последние 6 символов выделены на фоне приглушённой середины.
 function AddressText({ value }: { value: string }) {
@@ -17,19 +18,19 @@ function AddressText({ value }: { value: string }) {
   );
 }
 
-/** Адрес записи: ссылка в Tronscan (для TRON-адресов) + кнопка копирования. */
-export function AddressCell({ address }: { address: string | null }) {
+/** Адрес записи: ссылка в обозреватель своей сети (если формат верный) + кнопка копирования. */
+export function AddressCell({ chain, address }: { chain: Chain; address: string | null }) {
   if (!address) return null;
   return (
     <span className="inline-flex items-center gap-1">
-      {isTronAddress(address) ? (
+      {isChainAddress(chain, address) ? (
         <a
-          href={`https://tronscan.org/#/address/${address.trim()}`}
+          href={explorerAddressUrl(chain, address)}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           className="hover:underline underline-offset-2"
-          title="Открыть в Tronscan"
+          title={`Открыть в ${CHAIN_META[chain].explorerName}`}
         >
           <AddressText value={address} />
         </a>

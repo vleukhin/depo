@@ -31,3 +31,18 @@ export function decimalToMicro(value: string): number {
   }
   return Number(micro);
 }
+
+/**
+ * Сырые base units токена -> целые micro-единицы (× 1 000 000).
+ * Нужна для EVM: у BEP-20 USDT 18 знаков, у нативных BNB/ETH тоже 18 —
+ * прямое приведение к Number переполнило бы безопасный диапазон, поэтому
+ * масштабируем на BigInt (знаки после шестого отбрасываются).
+ */
+export function baseUnitsToMicro(raw: bigint, decimals: number): number {
+  const micro =
+    decimals >= 6 ? raw / 10n ** BigInt(decimals - 6) : raw * 10n ** BigInt(6 - decimals);
+  if (micro > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Баланс превышает безопасный диапазон");
+  }
+  return Number(micro);
+}

@@ -184,7 +184,7 @@ export function DebtsSection() {
                   <TableCell className="text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
                       {debt.placement_name ?? debt.source_text}
-                      <TxLink txId={debt.tx_id} />
+                      <TxLink chain={debt.placement_chain ?? "tron"} txId={debt.tx_id} />
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
@@ -253,6 +253,7 @@ export function DebtsSection() {
                 </button>
                 {debt.tx_id && (
                   <TxLink
+                    chain={debt.placement_chain ?? "tron"}
                     txId={debt.tx_id}
                     className="flex size-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
                   />

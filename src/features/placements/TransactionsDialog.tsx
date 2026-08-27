@@ -73,6 +73,7 @@ export function TransactionsDialog({
               {transfers.map((t) => (
                 <TransferRow
                   key={t.tx_id}
+                  chain={placement.chain}
                   transfer={t}
                   onCreateDebt={() => setDraft({ amount: t.amount, tx_id: t.tx_id })}
                 />

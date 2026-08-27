@@ -20,19 +20,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TrxIcon } from "@/components/TrxAmount";
-import { isTronAddress } from "@/lib/tron";
-import { useExchangeTrxInfo, useWithdrawTrx } from "@/hooks/usePlacements";
+import { NativeIcon } from "@/components/GasAmount";
+import { CHAIN_META, explorerAddressUrl, isChainAddress } from "@/lib/chains";
+import { useExchangeGasInfo, useWithdrawGas } from "@/hooks/usePlacements";
 import type { Exchange, Placement } from "@/types";
 
-// Пока on-chain вывод TRX реализован только для Bitget (структура — под будущие биржи).
+// Пока on-chain вывод реализован только для Bitget (структура — под будущие биржи).
 const WITHDRAW_EXCHANGES: Exchange[] = ["Bitget"];
 
-// Локальный форматтер TRX: точные суммы с группировкой (в отличие от таблицы,
-// где TRX округляется до целых) — на экране вывода важна точность.
-const trxFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 6 });
+// Локальный форматтер: точные суммы с группировкой (в отличие от таблицы, где
+// баланс округляется) — на экране вывода важна точность до последнего знака.
+const coinFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 6 });
 
-export function TrxTopUpDialog({
+export function GasTopUpDialog({
   placement,
   open,
   onOpenChange,
@@ -45,8 +45,11 @@ export function TrxTopUpDialog({
   const [amount, setAmount] = useState("");
   const [step, setStep] = useState<"form" | "confirm">("form");
 
-  const info = useExchangeTrxInfo(exchange, "spot", open);
-  const withdraw = useWithdrawTrx();
+  // Монета и сеть вывода определяются записью-получателем, а не выбором в попапе.
+  const { chain } = placement;
+  const coin = CHAIN_META[chain].native;
+  const info = useExchangeGasInfo(exchange, chain, "spot", open);
+  const withdraw = useWithdrawGas();
 
   const address = placement.address ?? "";
   const amountNum = Number(amount.replace(",", "."));
@@ -59,7 +62,7 @@ export function TrxTopUpDialog({
   const amountError = (() => {
     if (amount.trim() === "") return null;
     if (!Number.isFinite(amountNum) || amountNum <= 0) return "Некорректная сумма";
-    if (min != null && amountNum < min) return `Минимум ${trxFmt.format(min)} TRX`;
+    if (min != null && amountNum < min) return `Минимум ${coinFmt.format(min)} ${coin}`;
     if (balance != null && amountNum > balance) return "Больше баланса на бирже";
     return null;
   })();
@@ -93,7 +96,9 @@ export function TrxTopUpDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Пополнить TRX — {placement.name}</DialogTitle>
+          <DialogTitle>
+            Пополнить {coin} — {placement.name}
+          </DialogTitle>
         </DialogHeader>
 
         {step === "form" ? (
@@ -116,9 +121,9 @@ export function TrxTopUpDialog({
 
             <div className="space-y-1">
               <Label>Адрес получателя</Label>
-              {isTronAddress(address) ? (
+              {isChainAddress(chain, address) ? (
                 <a
-                  href={`https://tronscan.org/#/address/${address.trim()}`}
+                  href={explorerAddressUrl(chain, address)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground hover:text-foreground hover:underline underline-offset-2"
@@ -141,13 +146,15 @@ export function TrxTopUpDialog({
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Баланс на {exchange} (спот)</span>
                     <span className="inline-flex items-center gap-1 tabular-nums font-medium">
-                      {trxFmt.format(balance ?? 0)} <TrxIcon className="size-3.5" />
+                      {coinFmt.format(balance ?? 0)} <NativeIcon chain={chain} className="size-3.5" />
                     </span>
                   </div>
                   {(fee != null || min != null) && (
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{min != null ? `Минимум: ${trxFmt.format(min)} TRX` : ""}</span>
-                      <span>{fee != null ? `Комиссия сети: ${trxFmt.format(fee)} TRX` : ""}</span>
+                      <span>{min != null ? `Минимум: ${coinFmt.format(min)} ${coin}` : ""}</span>
+                      <span>
+                        {fee != null ? `Комиссия сети: ${coinFmt.format(fee)} ${coin}` : ""}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -155,11 +162,11 @@ export function TrxTopUpDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="trx-amount" className="gap-1">
-                Сумма, <TrxIcon className="size-3.5" />
+              <Label htmlFor="gas-amount" className="gap-1">
+                Сумма, <NativeIcon chain={chain} className="size-3.5" />
               </Label>
               <Input
-                id="trx-amount"
+                id="gas-amount"
                 type="number"
                 step="0.000001"
                 min="0"
@@ -181,10 +188,13 @@ export function TrxTopUpDialog({
           <div className="space-y-4">
             <div className="rounded-md border p-3 text-sm space-y-2">
               <Row label="Биржа" value={exchange} />
-              <Row label="Сумма к списанию" value={`${trxFmt.format(amountNum)} TRX`} />
-              {fee != null && <Row label="Комиссия сети" value={`${trxFmt.format(fee)} TRX`} />}
+              <Row label="Сеть" value={CHAIN_META[chain].label} />
+              <Row label="Сумма к списанию" value={`${coinFmt.format(amountNum)} ${coin}`} />
+              {fee != null && (
+                <Row label="Комиссия сети" value={`${coinFmt.format(fee)} ${coin}`} />
+              )}
               {net != null && net > 0 && (
-                <Row label="Дойдёт примерно" value={`${trxFmt.format(net)} TRX`} />
+                <Row label="Дойдёт примерно" value={`${coinFmt.format(net)} ${coin}`} />
               )}
               <div className="space-y-1 pt-1">
                 <span className="text-muted-foreground">Адрес получателя</span>

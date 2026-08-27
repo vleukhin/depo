@@ -63,7 +63,7 @@ export function PlacementsArchive() {
                         {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
                       </span>
                     ) : (
-                      <AddressCell address={p.address} />
+                      <AddressCell chain={p.chain} address={p.address} />
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground max-w-48 truncate">
@@ -117,7 +117,7 @@ export function PlacementsArchive() {
                         {p.exchange} · {ACCOUNT_LABELS[p.exchange_account]}
                       </span>
                     ) : (
-                      <AddressCell address={p.address} />
+                      <AddressCell chain={p.chain} address={p.address} />
                     )}
                   </dd>
                 </div>
