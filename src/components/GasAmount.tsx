@@ -2,9 +2,20 @@ import { cn } from "@/lib/utils";
 import { CHAIN_META } from "@/lib/chains";
 import type { Chain } from "@/types";
 
-/** Иконка нативной монеты сети: TRX (TRON), BNB (BSC) или ETH (Ethereum). */
-export function NativeIcon({ chain, className }: { chain: Chain; className?: string }) {
-  const label = CHAIN_META[chain].native;
+/**
+ * Иконка нативной монеты сети: TRX (TRON), BNB (BSC) или ETH (Ethereum).
+ * `label` перекрывает подпись для читалок — та же монета обозначает и саму
+ * сеть (в строке перевода она стоит рядом с суммой в USDT, а не с балансом газа).
+ */
+export function NativeIcon({
+  chain,
+  className,
+  label = CHAIN_META[chain].native,
+}: {
+  chain: Chain;
+  className?: string;
+  label?: string;
+}) {
   const common = {
     viewBox: "0 0 32 32",
     role: "img" as const,
