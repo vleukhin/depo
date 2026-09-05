@@ -1,9 +1,10 @@
 // Единая точка входа для истории переводов USDT: TRON читается через TronGrid,
-// EVM-сети — через Etherscan v2. Контракт страницы общий (UsdtTransfersPage),
-// курсор непрозрачный: у TRON это fingerprint, у EVM — номер страницы.
+// EVM-сети — через NodeReal MegaNode. Контракт страницы общий
+// (UsdtTransfersPage), курсор непрозрачный: у TRON это fingerprint,
+// у EVM — pageKey NodeReal.
 
 import { isEvmChain } from "@/lib/chains";
-import * as etherscan from "@/lib/etherscan";
+import * as nodereal from "@/lib/nodereal";
 import * as tron from "@/lib/tron";
 import type { Chain, UsdtTransfer, UsdtTransfersPage } from "@/types";
 
@@ -14,7 +15,7 @@ export function fetchUsdtTransfers(
   query: { limit?: number; cursor?: string } = {},
 ): Promise<UsdtTransfersPage> {
   return isEvmChain(chain)
-    ? etherscan.fetchUsdtTransfers(chain, address, { limit: query.limit, page: query.cursor })
+    ? nodereal.fetchUsdtTransfers(chain, address, { limit: query.limit, page: query.cursor })
     : tron.fetchUsdtTransfers(address, { limit: query.limit, fingerprint: query.cursor });
 }
 
@@ -26,13 +27,13 @@ export function fetchUsdtTransfersInRange(
   to: number,
 ): Promise<{ transfers: UsdtTransfer[]; truncated: boolean }> {
   return isEvmChain(chain)
-    ? etherscan.fetchUsdtTransfersInRange(chain, address, from, to)
+    ? nodereal.fetchUsdtTransfersInRange(chain, address, from, to)
     : tron.fetchUsdtTransfersInRange(address, from, to);
 }
 
 /**
  * Пауза между запросами истории по разным кошелькам: у TronGrid без ключа
- * жёсткий лимит, у Etherscan на бесплатном тарифе — 5 запросов в секунду.
+ * жёсткий лимит, у NodeReal на бесплатном тарифе — ограничение по CUPS.
  */
 export function historyRequestPause(chain: Chain): number {
   if (isEvmChain(chain)) return 250;
