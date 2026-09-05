@@ -177,6 +177,12 @@ async function blockNumberByTime(
  * включительно). Etherscan фильтрует по блокам, поэтому границы окна сначала
  * переводятся в номера блоков, а затем результат ещё раз просеивается по
  * точному времени. `truncated` — упёрлись в потолок страниц.
+ *
+ * Страницы читаются от свежих к старым (sort=desc) с ранним выходом, как только
+ * выборка ушла ниже нижней границы окна. Это важно, когда getblocknobytime не
+ * ответил и границей стал блок 0: при sort=asc такой скан выдавал бы первые
+ * страницы истории кошелька (переводы многолетней давности), они целиком
+ * отсеивались бы по времени и день молча выглядел бы пустым.
  */
 export async function fetchUsdtTransfersInRange(
   chain: EvmChain,
@@ -203,14 +209,16 @@ export async function fetchUsdtTransfersInRange(
       endblock: String(endblock ?? 99999999),
       page: String(page),
       offset: String(pageLimit),
-      sort: "asc",
+      sort: "desc",
     });
     // Границы блоков приблизительные (блок мог попасть на край окна) —
     // отсекаем по фактическому времени перевода.
-    transfers.push(
-      ...toTransfers(rows, address, chain).filter((t) => t.timestamp >= from && t.timestamp <= to),
-    );
-    if (rows.length < pageLimit) return { transfers, truncated: false };
+    const batch = toTransfers(rows, address, chain);
+    transfers.push(...batch.filter((t) => t.timestamp >= from && t.timestamp <= to));
+    // Порядок убывающий: страница с переводом старее окна — последняя нужная.
+    if (rows.length < pageLimit || batch.some((t) => t.timestamp < from)) {
+      return { transfers, truncated: false };
+    }
   }
   return { transfers, truncated: true };
 }
