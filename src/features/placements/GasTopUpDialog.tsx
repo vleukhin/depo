@@ -39,6 +39,13 @@ const coinFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 6 });
 // micro-единиц). Запятая допустима — ниже она приводится к точке.
 const AMOUNT_RE = /^\d*(?:[.,]\d{0,6})?$/;
 
+// Число -> строка для поля ввода. `coinFmt` тут не годится: он ставит разделители
+// групп, а их AMOUNT_RE не пропустит. Точка вместо запятой, без экспоненты,
+// хвостовые нули срезаны.
+function toAmountInput(n: number): string {
+  return n.toFixed(6).replace(/\.?0+$/, "");
+}
+
 export function GasTopUpDialog({
   placement,
   open,
@@ -162,7 +169,23 @@ export function GasTopUpDialog({
                   </div>
                   {(fee != null || min != null) && (
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{min != null ? `Минимум: ${coinFmt.format(min)} ${coin}` : ""}</span>
+                      <span>
+                        {min != null && (
+                          <>
+                            Минимум:{" "}
+                            {/* Клик подставляет минимум в поле суммы — набирать вручную
+                                дробь вроде 0,01 неудобно. */}
+                            <button
+                              type="button"
+                              onClick={() => setAmount(toAmountInput(min))}
+                              title="Подставить в поле суммы"
+                              className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                            >
+                              {coinFmt.format(min)} {coin}
+                            </button>
+                          </>
+                        )}
+                      </span>
                       <span>
                         {fee != null ? `Комиссия сети: ${coinFmt.format(fee)} ${coin}` : ""}
                       </span>
