@@ -32,6 +32,13 @@ const WITHDRAW_EXCHANGES: Exchange[] = ["Bitget"];
 // баланс округляется) — на экране вывода важна точность до последнего знака.
 const coinFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 6 });
 
+// Поле суммы — текстовое, а не type="number": браузер отдаёт пустую строку для
+// промежуточного ввода («0.», «1,»), и контролируемый инпут тут же стирает
+// разделитель — дробную сумму набрать невозможно. Фильтруем вручную: цифры,
+// один разделитель (точка или запятая) и до 6 знаков после него (точность
+// micro-единиц). Запятая допустима — ниже она приводится к точке.
+const AMOUNT_RE = /^\d*(?:[.,]\d{0,6})?$/;
+
 export function GasTopUpDialog({
   placement,
   open,
@@ -52,23 +59,27 @@ export function GasTopUpDialog({
   const withdraw = useWithdrawGas();
 
   const address = placement.address ?? "";
-  const amountNum = Number(amount.replace(",", "."));
+  const amountRaw = amount.trim();
+  const amountNum = Number(amountRaw.replace(",", "."));
   const balance = info.data?.balance ?? null;
   const fee = info.data?.fee ?? null;
   const min = info.data?.min ?? null;
   const net = fee != null ? amountNum - fee : null;
 
+  // Незаконченный ввод («0,» без дробной части) — ещё не сумма, но и не ошибка:
+  // ругаться на неё посреди набора дроби не нужно, достаточно не пускать дальше.
+  const amountPending = amountRaw === "" || /[.,]$/.test(amountRaw);
+
   // Границы суммы известны только в рантайме (из данных биржи), поэтому валидация — вручную.
   const amountError = (() => {
-    if (amount.trim() === "") return null;
+    if (amountPending) return null;
     if (!Number.isFinite(amountNum) || amountNum <= 0) return "Некорректная сумма";
     if (min != null && amountNum < min) return `Минимум ${coinFmt.format(min)} ${coin}`;
     if (balance != null && amountNum > balance) return "Больше баланса на бирже";
     return null;
   })();
 
-  const canProceed =
-    amount.trim() !== "" && amountError == null && !info.isLoading && !info.isError;
+  const canProceed = !amountPending && amountError == null && !info.isLoading && !info.isError;
 
   function handleOpenChange(v: boolean) {
     if (!v) {
@@ -167,13 +178,15 @@ export function GasTopUpDialog({
               </Label>
               <Input
                 id="gas-amount"
-                type="number"
-                step="0.000001"
-                min="0"
+                type="text"
                 inputMode="decimal"
+                autoComplete="off"
                 placeholder="0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (AMOUNT_RE.test(v)) setAmount(v);
+                }}
               />
               {amountError && <p className="text-sm text-destructive">{amountError}</p>}
             </div>
