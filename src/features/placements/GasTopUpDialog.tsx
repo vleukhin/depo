@@ -30,7 +30,29 @@ const WITHDRAW_EXCHANGES: Exchange[] = ["Bitget"];
 
 // Локальный форматтер: точные суммы с группировкой (в отличие от таблицы, где
 // баланс округляется) — на экране вывода важна точность до последнего знака.
-const coinFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 6 });
+// Восьми знаков хватает и на минимум, и на комиссию биржи (у них бывает больше
+// шести); дальше упираемся в мусор двоичного представления, а не в данные.
+const coinFmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 8 });
+
+// Поле суммы — текстовое, а не type="number": браузер отдаёт пустую строку для
+// промежуточного ввода («0.», «1,»), и контролируемый инпут тут же стирает
+// разделитель — дробную сумму набрать невозможно. Поэтому фильтруем вручную:
+// цифры, один разделитель (точка или запятая) и знаки после него по точности
+// монеты. Запятая допустима — ниже она приводится к точке.
+const amountRe = (decimals: number) => new RegExp(`^\\d*(?:[.,]\\d{0,${decimals}})?$`);
+
+// Число -> строка для поля ввода: без разделителей групп (фильтр их не пропустит)
+// и без потери знаков. Округлять нельзя: биржа отдаёт минимум вывода с произвольной
+// точностью, и округлённый вниз минимум оказывался чуть МЕНЬШЕ настоящего — поле
+// ругалось «Минимум …» ровно на то значение, которое само же и подставило.
+function toAmountInput(n: number): string {
+  const s = String(n);
+  // С 1e-7 JS уходит в экспоненциальную запись — разворачиваем в обычную дробь.
+  const exp = /^(\d)(?:\.(\d+))?e-(\d+)$/.exec(s);
+  if (!exp) return s;
+  const [, int, frac = "", power] = exp;
+  return `0.${"0".repeat(Number(power) - 1)}${int}${frac}`;
+}
 
 export function GasTopUpDialog({
   placement,
@@ -47,28 +69,35 @@ export function GasTopUpDialog({
 
   // Монета и сеть вывода определяются записью-получателем, а не выбором в попапе.
   const { chain } = placement;
-  const coin = CHAIN_META[chain].native;
+  // Сумма вывода нигде не хранится в micro — она уходит на биржу десятичной
+  // строкой, так что ограничивать ввод шестью знаками (точность БД) нельзя:
+  // минимум вывода у BNB/ETH бывает длиннее, и ввести его было невозможно.
+  const { native: coin, nativeDecimals } = CHAIN_META[chain];
   const info = useExchangeGasInfo(exchange, chain, "spot", open);
   const withdraw = useWithdrawGas();
 
   const address = placement.address ?? "";
-  const amountNum = Number(amount.replace(",", "."));
+  const amountRaw = amount.trim();
+  const amountNum = Number(amountRaw.replace(",", "."));
   const balance = info.data?.balance ?? null;
   const fee = info.data?.fee ?? null;
   const min = info.data?.min ?? null;
   const net = fee != null ? amountNum - fee : null;
 
+  // Незаконченный ввод («0,» без дробной части) — ещё не сумма, но и не ошибка:
+  // ругаться на неё посреди набора дроби не нужно, достаточно не пускать дальше.
+  const amountPending = amountRaw === "" || /[.,]$/.test(amountRaw);
+
   // Границы суммы известны только в рантайме (из данных биржи), поэтому валидация — вручную.
   const amountError = (() => {
-    if (amount.trim() === "") return null;
+    if (amountPending) return null;
     if (!Number.isFinite(amountNum) || amountNum <= 0) return "Некорректная сумма";
     if (min != null && amountNum < min) return `Минимум ${coinFmt.format(min)} ${coin}`;
     if (balance != null && amountNum > balance) return "Больше баланса на бирже";
     return null;
   })();
 
-  const canProceed =
-    amount.trim() !== "" && amountError == null && !info.isLoading && !info.isError;
+  const canProceed = !amountPending && amountError == null && !info.isLoading && !info.isError;
 
   function handleOpenChange(v: boolean) {
     if (!v) {
@@ -151,7 +180,23 @@ export function GasTopUpDialog({
                   </div>
                   {(fee != null || min != null) && (
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{min != null ? `Минимум: ${coinFmt.format(min)} ${coin}` : ""}</span>
+                      <span>
+                        {min != null && (
+                          <>
+                            Минимум:{" "}
+                            {/* Клик подставляет минимум в поле суммы — набирать вручную
+                                дробь вроде 0,01 неудобно. */}
+                            <button
+                              type="button"
+                              onClick={() => setAmount(toAmountInput(min))}
+                              title="Подставить в поле суммы"
+                              className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                            >
+                              {coinFmt.format(min)} {coin}
+                            </button>
+                          </>
+                        )}
+                      </span>
                       <span>
                         {fee != null ? `Комиссия сети: ${coinFmt.format(fee)} ${coin}` : ""}
                       </span>
@@ -167,13 +212,15 @@ export function GasTopUpDialog({
               </Label>
               <Input
                 id="gas-amount"
-                type="number"
-                step="0.000001"
-                min="0"
+                type="text"
                 inputMode="decimal"
+                autoComplete="off"
                 placeholder="0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (amountRe(nativeDecimals).test(v)) setAmount(v);
+                }}
               />
               {amountError && <p className="text-sm text-destructive">{amountError}</p>}
             </div>

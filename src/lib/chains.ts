@@ -16,7 +16,8 @@ export interface ChainMeta {
   explorerAddress: string; // префикс ссылки на адрес
   explorerTx: string; // префикс ссылки на транзакцию
   bitgetChain: string; // имя сети в API Bitget (параметр `chain` при выводе)
-  evmChainId: number | null; // chainid для EVM-RPC и Etherscan V2; null — TRON
+  evmChainId: number | null; // chainid для EVM-RPC; null — TRON
+  noderealNetwork: string | null; // поддомен эндпоинта NodeReal (история переводов); null — TRON
 }
 
 export const CHAIN_META: Record<Chain, ChainMeta> = {
@@ -31,6 +32,7 @@ export const CHAIN_META: Record<Chain, ChainMeta> = {
     explorerTx: "https://tronscan.org/#/transaction/",
     bitgetChain: "TRX",
     evmChainId: null,
+    noderealNetwork: null,
   },
   bsc: {
     label: "BSC",
@@ -44,6 +46,7 @@ export const CHAIN_META: Record<Chain, ChainMeta> = {
     explorerTx: "https://bscscan.com/tx/",
     bitgetChain: "BEP20",
     evmChainId: 56,
+    noderealNetwork: "bsc-mainnet",
   },
   ethereum: {
     label: "Ethereum",
@@ -56,6 +59,7 @@ export const CHAIN_META: Record<Chain, ChainMeta> = {
     explorerTx: "https://etherscan.io/tx/",
     bitgetChain: "ERC20",
     evmChainId: 1,
+    noderealNetwork: "eth-mainnet",
   },
 };
 
