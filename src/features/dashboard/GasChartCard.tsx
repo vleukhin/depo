@@ -131,7 +131,7 @@ export function GasChartCard() {
                     minTickGap={24}
                   />
                   <YAxis
-                    tickFormatter={formatGas}
+                    tickFormatter={(value: number) => formatGas(chain, value)}
                     tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
                     tickLine={false}
                     axisLine={false}
