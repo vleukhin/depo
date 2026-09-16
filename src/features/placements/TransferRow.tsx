@@ -3,6 +3,7 @@
 import { ArrowDownLeft, ArrowUpRight, ExternalLink, FilePlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { NativeIcon } from "@/components/GasAmount";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { UsdtIcon } from "@/components/UsdtAmount";
 import { CHAIN_META, explorerAddressUrl, explorerTxUrl } from "@/lib/chains";
@@ -62,6 +63,15 @@ export function TransferRow({
           {out ? "−" : "+"}
           {amountFmt.format(transfer.amount)}
           <UsdtIcon className="size-3.5 shrink-0" />
+          {/* Сеть перевода — монетой сети, как в колонке газа. В дневном списке
+              строки разных сетей перемешаны, и без неё их не различить. */}
+          <span className="inline-flex" title={`Сеть ${CHAIN_META[chain].label}`}>
+            <NativeIcon
+              chain={chain}
+              className="size-3.5 shrink-0"
+              label={`Сеть ${CHAIN_META[chain].label}`}
+            />
+          </span>
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {walletName && (
