@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CHAIN_META, isChainAddress } from "@/lib/chains";
 import {
+  BANDWIDTH_DURATIONS,
   CHAINS,
   EXCHANGE_ACCOUNTS,
   EXCHANGES,
@@ -130,6 +131,24 @@ export const gasWithdrawInput = z.object({
   amount: z.number({ message: "Укажите сумму" }).positive("Сумма должна быть больше нуля"),
 });
 
+// Параметры аренды энергии в TronRental: объём считается сервером из числа
+// переводов USDT (65 000 / 131 000 энергии и 350 bandwidth на перевод). Потолок
+// переводов — из лимита TronRental в 5 000 000 энергии на заказ (÷ 131 000).
+export const energyRentParams = z.object({
+  transfers: z
+    .number({ message: "Укажите число переводов" })
+    .int("Число переводов — целое")
+    .min(1, "Минимум 1 перевод")
+    .max(30, "Максимум 30 переводов"),
+  newRecipient: z.boolean(),
+  bandwidth: z.enum(BANDWIDTH_DURATIONS, { message: "Некорректный срок bandwidth" }),
+});
+
+// Ввод для аренды: адрес — только из сохранённой записи по placementId.
+export const energyRentInput = energyRentParams.extend({
+  placementId: z.number({ message: "Некорректная запись" }).int().positive(),
+});
+
 // Результат разбора заявки на долг из Telegram (LLM возвращает JSON по этой схеме;
 // regex-фолбэк собирает тот же контракт). Суммы — десятичные USDT.
 export const parsedRequest = z.object({
@@ -151,6 +170,8 @@ export type PlacementInput = z.infer<typeof placementInput>;
 export type DebtInput = z.infer<typeof debtInput>;
 export type SnapshotInput = z.infer<typeof snapshotInput>;
 export type GasWithdrawInput = z.infer<typeof gasWithdrawInput>;
+export type EnergyRentParams = z.infer<typeof energyRentParams>;
+export type EnergyRentInput = z.infer<typeof energyRentInput>;
 export type ParsedRequestOutput = z.infer<typeof parsedRequest>;
 
 // input-типы для react-hook-form (до zod-трансформаций).

@@ -1,9 +1,17 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { createResourceHooks } from "@/hooks/createResourceHooks";
 import { api } from "@/lib/api";
 import type {
   CheckBalancesResult,
   DayTransfers,
+  EnergyRentalQuote,
+  EnergyRentResult,
   Exchange,
   ExchangeAccount,
   Chain,
@@ -12,7 +20,12 @@ import type {
   UsdtTransfersPage,
   WithdrawGasResult,
 } from "@/types";
-import type { GasWithdrawInput, PlacementInput } from "@/lib/validate";
+import type {
+  EnergyRentInput,
+  EnergyRentParams,
+  GasWithdrawInput,
+  PlacementInput,
+} from "@/lib/validate";
 
 export const {
   useList: usePlacements,
@@ -107,6 +120,40 @@ export function useWithdrawGas() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["placements"] });
       qc.invalidateQueries({ queryKey: ["summary"] });
+    },
+  });
+}
+
+/**
+ * Котировка аренды энергии (+ bandwidth) в TronRental и баланс аккаунта.
+ * Прошлая котировка держится на экране, пока грузится новая (смена параметров).
+ */
+export function useEnergyRentalQuote(params: EnergyRentParams, enabled: boolean) {
+  const { transfers, newRecipient, bandwidth } = params;
+  return useQuery({
+    queryKey: ["energy-rental-quote", transfers, newRecipient, bandwidth],
+    queryFn: () =>
+      api.get<EnergyRentalQuote>(
+        `/api/placements/energy-rental-quote?transfers=${transfers}` +
+          `&newRecipient=${newRecipient ? 1 : 0}&bandwidth=${bandwidth}`,
+      ),
+    enabled,
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+}
+
+/** Аренда энергии в TronRental на адрес кошелька: баланс TRX записи не меняется. */
+export function useRentEnergy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: EnergyRentInput) =>
+      api.post<EnergyRentResult>("/api/placements/rent-energy", input),
+    onSuccess: () => {
+      // Списание с баланса TronRental — котировки показывают устаревший баланс.
+      qc.invalidateQueries({ queryKey: ["energy-rental-quote"] });
     },
   });
 }

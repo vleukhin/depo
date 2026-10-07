@@ -455,7 +455,11 @@ export function PlacementsSection() {
                           size="icon"
                           className="size-6"
                           aria-label={`Пополнить ${CHAIN_META[p.chain].native}`}
-                          title={`Пополнить ${CHAIN_META[p.chain].native} с биржи`}
+                          title={
+                            p.chain === "tron"
+                              ? "Пополнить TRX с биржи или арендовать энергию"
+                              : `Пополнить ${CHAIN_META[p.chain].native} с биржи`
+                          }
                           onClick={(e) => {
                             e.stopPropagation();
                             setTopUp(p);

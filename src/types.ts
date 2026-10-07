@@ -140,6 +140,27 @@ export interface WithdrawGasResult {
   orderId: string; // id заявки на вывод, созданной биржей
 }
 
+// Аренда bandwidth в TronRental: не нужна, на 1 час или на сутки.
+export const BANDWIDTH_DURATIONS = ["none", "1h", "1d"] as const;
+export type BandwidthDuration = (typeof BANDWIDTH_DURATIONS)[number];
+
+// Котировка аренды энергии (+ bandwidth) в TronRental. Суммы — в десятичных TRX.
+export interface EnergyRentalQuote {
+  balance: number; // TRX-баланс аккаунта TronRental
+  energy: { volume: number; total: number };
+  bandwidth: { volume: number; duration: Exclude<BandwidthDuration, "none">; total: number } | null;
+  total: number; // энергия + bandwidth
+}
+
+export interface EnergyRentResult {
+  energyOrderId: number;
+  energyPrice: number; // TRX
+  bandwidthOrderId: number | null;
+  bandwidthPrice: number | null; // TRX
+  // Энергия уже куплена, а bandwidth — нет: частичный успех, а не ошибка запроса.
+  bandwidthError: string | null;
+}
+
 export interface Manager {
   id: number;
   name: string;
