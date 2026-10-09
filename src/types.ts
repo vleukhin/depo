@@ -188,6 +188,17 @@ export interface Debt {
   updated_at: string;
 }
 
+/** Размер страницы архива (свободные средства и долги). */
+export const ARCHIVE_PAGE_SIZE = 20;
+
+/** Страница архива: записи текущей страницы + общее число удалённых для пагинации. */
+export interface ArchivePage<T> {
+  items: T[];
+  total: number;
+  page: number; // с 1
+  page_size: number;
+}
+
 // Строка сводки по долгам: группа (менеджер или сервис) с суммой и числом записей.
 export interface DebtsSummaryRow {
   name: string | null; // NULL — менеджер/сервис не указан

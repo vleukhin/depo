@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import type { ArchivePage } from "@/types";
 
 /** Фабрика CRUD-хуков для сущности с REST-эндпоинтом /api/<path>. */
 export function createResourceHooks<T extends { id: number }, Input>(
@@ -14,11 +15,13 @@ export function createResourceHooks<T extends { id: number }, Input>(
     return useQuery({ queryKey: listKey, queryFn: () => api.get<T[]>(url) });
   }
 
-  /** Только мягко удалённые записи (страница архива). */
-  function useListDeleted() {
+  /** Только мягко удалённые записи (страница архива), постранично. */
+  function useListDeleted(page: number) {
     return useQuery({
-      queryKey: [key, "deleted"],
-      queryFn: () => api.get<T[]>(`${url}?deleted=1`),
+      queryKey: [key, "deleted", page],
+      queryFn: () => api.get<ArchivePage<T>>(`${url}?deleted=1&page=${page}`),
+      // Пока грузится новая страница, показываем прежнюю — без мигания «Архив пуст».
+      placeholderData: keepPreviousData,
     });
   }
 
@@ -57,7 +60,7 @@ export function createResourceHooks<T extends { id: number }, Input>(
     });
   }
 
-  /** Восстановление мягко удалённой записи. Инвалидация [key] префиксно накрывает и [key, "deleted"]. */
+  /** Восстановление мягко удалённой записи. Инвалидация [key] префиксно накрывает и [key, "deleted", page]. */
   function useRestore() {
     const invalidate = useInvalidate();
     return useMutation({

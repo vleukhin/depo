@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ServiceIcon } from "@/components/ServiceIcon";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RestoreButton } from "@/components/RestoreButton";
+import { ArchivePagination, pageCount } from "@/components/ArchivePagination";
 import { TxLink } from "@/components/TxLink";
 import { formatDate, formatUsdt } from "@/lib/format";
 import { useDeletedDebts, useRestoreDebt } from "@/hooks/useDebts";
@@ -35,7 +37,11 @@ function SourceCell({ debt }: { debt: Debt }) {
 
 /** Архив долгов: только удалённые записи, их можно восстановить. */
 export function DebtsArchive() {
-  const { data: debts = [], isLoading } = useDeletedDebts();
+  const [page, setPage] = useState(1);
+  const { data, isLoading, isPlaceholderData } = useDeletedDebts(page);
+  const debts = data?.items ?? [];
+  // Восстановили последние записи на последней странице — откатываемся на существующую.
+  if (data && !isPlaceholderData && page > pageCount(data)) setPage(pageCount(data));
   const restore = useRestoreDebt();
 
   return (
@@ -46,7 +52,7 @@ export function DebtsArchive() {
           Удалённые записи: не входят в сверку. Восстановленная запись вернётся в конец списка.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className={isPlaceholderData ? "opacity-60 transition-opacity" : undefined}>
         <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
@@ -178,6 +184,8 @@ export function DebtsArchive() {
             </li>
           )}
         </ul>
+
+        <ArchivePagination data={data} onPageChange={setPage} />
       </CardContent>
     </Card>
   );

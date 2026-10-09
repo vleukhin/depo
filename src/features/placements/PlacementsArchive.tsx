@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -10,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RestoreButton } from "@/components/RestoreButton";
+import { ArchivePagination, pageCount } from "@/components/ArchivePagination";
 import { AddressCell } from "@/components/AddressCell";
 import { TagBadge } from "@/components/TagBadge";
 import { formatDate } from "@/lib/format";
@@ -18,7 +20,11 @@ import { ACCOUNT_LABELS } from "./PlacementForm";
 
 /** Архив свободных средств: только удалённые записи, их можно восстановить. */
 export function PlacementsArchive() {
-  const { data: placements = [], isLoading } = useDeletedPlacements();
+  const [page, setPage] = useState(1);
+  const { data, isLoading, isPlaceholderData } = useDeletedPlacements(page);
+  const placements = data?.items ?? [];
+  // Восстановили последние записи на последней странице — откатываемся на существующую.
+  if (data && !isPlaceholderData && page > pageCount(data)) setPage(pageCount(data));
   const restore = useRestorePlacement();
 
   return (
@@ -30,7 +36,7 @@ export function PlacementsArchive() {
           вернётся в конец списка.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className={isPlaceholderData ? "opacity-60 transition-opacity" : undefined}>
         <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
@@ -148,6 +154,8 @@ export function PlacementsArchive() {
             </li>
           )}
         </ul>
+
+        <ArchivePagination data={data} onPageChange={setPage} />
       </CardContent>
     </Card>
   );

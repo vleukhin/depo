@@ -1,8 +1,9 @@
 import type { Row } from "@libsql/client";
 import { getClient } from "@/lib/db";
 import { fromMicro, toMicro } from "@/lib/money";
-import { CHAINS } from "@/types";
+import { ARCHIVE_PAGE_SIZE, CHAINS } from "@/types";
 import type {
+  ArchivePage,
   Fund,
   Manager,
   Tag,
@@ -334,13 +335,25 @@ export async function listPlacements(): Promise<Placement[]> {
   );
   return withTags(rs.rows.map(toPlacement));
 }
-/** Удалённые записи свободных средств — для страницы архива, свежеудалённые сверху. */
-export async function listDeletedPlacements(): Promise<Placement[]> {
+/** Удалённые записи свободных средств — страница архива, свежеудалённые сверху. */
+export async function listDeletedPlacements(page: number): Promise<ArchivePage<Placement>> {
   const db = await getClient();
-  const rs = await db.execute(
-    "SELECT * FROM placements WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC, id DESC",
+  const [rs, cnt] = await db.batch(
+    [
+      {
+        sql: "SELECT * FROM placements WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC, id DESC LIMIT ? OFFSET ?",
+        args: [ARCHIVE_PAGE_SIZE, (page - 1) * ARCHIVE_PAGE_SIZE],
+      },
+      "SELECT COUNT(*) AS c FROM placements WHERE deleted_at IS NOT NULL",
+    ],
+    "read",
   );
-  return withTags(rs.rows.map(toPlacement));
+  return {
+    items: await withTags(rs.rows.map(toPlacement)),
+    total: Number(cnt.rows[0].c),
+    page,
+    page_size: ARCHIVE_PAGE_SIZE,
+  };
 }
 export async function getPlacement(id: number): Promise<Placement | null> {
   const db = await getClient();
@@ -444,13 +457,25 @@ export async function listDebts(): Promise<Debt[]> {
   );
   return rs.rows.map(toDebt);
 }
-/** Удалённые долги — для страницы архива, свежеудалённые сверху. */
-export async function listDeletedDebts(): Promise<Debt[]> {
+/** Удалённые долги — страница архива, свежеудалённые сверху. */
+export async function listDeletedDebts(page: number): Promise<ArchivePage<Debt>> {
   const db = await getClient();
-  const rs = await db.execute(
-    `${DEBT_SELECT_ARCHIVE} WHERE d.deleted_at IS NOT NULL ORDER BY d.deleted_at DESC, d.id DESC`,
+  const [rs, cnt] = await db.batch(
+    [
+      {
+        sql: `${DEBT_SELECT_ARCHIVE} WHERE d.deleted_at IS NOT NULL ORDER BY d.deleted_at DESC, d.id DESC LIMIT ? OFFSET ?`,
+        args: [ARCHIVE_PAGE_SIZE, (page - 1) * ARCHIVE_PAGE_SIZE],
+      },
+      "SELECT COUNT(*) AS c FROM debts WHERE deleted_at IS NOT NULL",
+    ],
+    "read",
   );
-  return rs.rows.map(toDebt);
+  return {
+    items: rs.rows.map(toDebt),
+    total: Number(cnt.rows[0].c),
+    page,
+    page_size: ARCHIVE_PAGE_SIZE,
+  };
 }
 /** Долги (включая удалённые), привязанные к транзакциям: tx_id -> ссылка на долг (для меток в попапе). */
 export async function findDebtsByTxIds(txIds: string[]): Promise<Map<string, TransferDebtRef>> {

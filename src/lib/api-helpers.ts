@@ -40,3 +40,9 @@ export function parseId(value: string): number {
   }
   return id;
 }
+
+/** Номер страницы из query (?page=N, с 1). Мусор и отсутствие параметра — первая страница. */
+export function parsePage(value: string | null): number {
+  const page = Number(value);
+  return Number.isInteger(page) && page >= 1 ? page : 1;
+}

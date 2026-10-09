@@ -63,24 +63,28 @@ export function TransactionsDialog({
           <p className="py-6 text-center text-sm text-muted-foreground">Загрузка транзакций…</p>
         ) : tx.isError && !tx.data ? (
           <p className="py-6 text-center text-sm text-destructive">{(tx.error as Error).message}</p>
-        ) : transfers.length === 0 ? (
+        ) : transfers.length === 0 && !tx.hasNextPage ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             Переводов USDT не найдено.
           </p>
         ) : (
+          // Страница может прийти пустой, но с курсором — сервер отсеял
+          // скам-«пыль». Тогда остаётся только кнопка «Показать ещё».
           <>
-            <ul className="-mr-2 max-h-[60vh] divide-y overflow-y-auto pr-2">
-              {transfers.map((t) => (
-                <TransferRow
-                  // Не tx_id: одна транзакция может нести несколько переводов
-                  // (в EVM это обычное дело), ключи не должны совпадать.
-                  key={`${t.tx_id}:${t.from}:${t.to}:${t.amount}`}
-                  chain={placement.chain}
-                  transfer={t}
-                  onCreateDebt={() => setDraft({ amount: t.amount, tx_id: t.tx_id })}
-                />
-              ))}
-            </ul>
+            {transfers.length > 0 && (
+              <ul className="-mr-2 max-h-[60vh] divide-y overflow-y-auto pr-2">
+                {transfers.map((t) => (
+                  <TransferRow
+                    // Не tx_id: одна транзакция может нести несколько переводов
+                    // (в EVM это обычное дело), ключи не должны совпадать.
+                    key={`${t.tx_id}:${t.from}:${t.to}:${t.amount}`}
+                    chain={placement.chain}
+                    transfer={t}
+                    onCreateDebt={() => setDraft({ amount: t.amount, tx_id: t.tx_id })}
+                  />
+                ))}
+              </ul>
+            )}
             {tx.hasNextPage && (
               <Button
                 type="button"
