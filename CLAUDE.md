@@ -26,7 +26,7 @@ Before running: copy `.env.example` to `.env`. `APP_PASSWORD` is mandatory — w
 
 ## Agent pipeline
 
-Tasks live in Linear (team Depo, two-way synced with GitHub Issues); agents run in GitHub Actions in stages — plan (`agent:plan` label) → build (`agent:build`) → review (automatic on `claude/**` PRs) → the owner merges, Vercel deploys. How it works and one-time setup: `docs/PIPELINE.md`. Per-stage instructions for agents: `.claude/pipeline/{plan,build,review}.md`. Where the app is deployed and how to check it: `docs/RUNBOOK.md`.
+Tasks live in Linear (team Crypto Development, synced with GitHub Issues); agents run in GitHub Actions in stages — plan (`agent:plan` label) → build (`agent:build`) → review (automatic on `claude/**` PRs) → the owner merges, Vercel deploys. How it works and one-time setup: `docs/PIPELINE.md`. Per-stage instructions for agents: `.claude/pipeline/{plan,build,review}.md`. Where the app is deployed and how to check it: `docs/RUNBOOK.md`.
 
 ## Next.js 16 specifics used here
 
