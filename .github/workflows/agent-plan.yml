@@ -13,9 +13,10 @@ concurrency:
 
 jobs:
   plan:
-    # Запускает только владелец репозитория (репозиторий публичный).
+    # Запускает только владелец репозитория — напрямую или через Linear
+    # (linear[bot] действует только из вашего рабочего пространства Linear).
     if: |
-      github.event.sender.login == github.repository_owner &&
+      (github.event.sender.login == github.repository_owner || github.event.sender.login == 'linear[bot]') &&
       (
         (github.event.action == 'labeled' && github.event.label.name == 'agent:plan') ||
         (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent:plan'))
@@ -39,7 +40,7 @@ jobs:
           gh api "repos/$REPO/issues/$ISSUE" \
             --jq '"# " + .title + "\n\n" + (.body // "")' > .agent-context/task.md
           gh api --paginate "repos/$REPO/issues/$ISSUE/comments" \
-            --jq '.[] | select(.user.login == env.OWNER or .user.login == "github-actions[bot]" or .user.login == "claude[bot]") | "\n\n---\nКомментарий " + .user.login + " (" + .created_at + "):\n\n" + .body' \
+            --jq '.[] | select(.user.login == env.OWNER or .user.login == "github-actions[bot]" or .user.login == "claude[bot]" or .user.login == "linear[bot]") | "\n\n---\nКомментарий " + .user.login + " (" + .created_at + "):\n\n" + .body' \
             >> .agent-context/task.md
 
       - uses: anthropics/claude-code-action@v1
@@ -49,6 +50,8 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Токен задания вместо токена приложения: права ровно те, что в permissions выше.
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Задачи и метки из Linear приходят от имени его приложения.
+          allowed_bots: "linear[bot]"
           prompt: |
             REPO: ${{ github.repository }}
             ISSUE: ${{ github.event.issue.number }}

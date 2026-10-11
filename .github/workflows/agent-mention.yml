@@ -18,7 +18,7 @@ concurrency:
 jobs:
   respond:
     if: |
-      github.event.sender.login == github.repository_owner &&
+      (github.event.sender.login == github.repository_owner || github.event.sender.login == 'linear[bot]') &&
       (
         (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
         (github.event_name != 'pull_request_review' && contains(github.event.comment.body, '@claude'))
@@ -45,7 +45,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          include_comments_by_actor: "${{ github.repository_owner }},github-actions[bot],claude[bot]"
+          allowed_bots: "linear[bot]"
+          include_comments_by_actor: "${{ github.repository_owner }},github-actions[bot],claude[bot],linear[bot]"
           additional_permissions: |
             actions: read
           claude_args: |
