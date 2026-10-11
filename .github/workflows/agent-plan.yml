@@ -1,68 +1,72 @@
 name: "Агент · 1 · План"
 
-# Задача с меткой `agent:plan` -> агент читает код и либо задаёт уточняющие вопросы
-# (метка `agent:questions`), либо пишет план. Ответ владельца комментарием в задаче
-# с меткой `agent:questions` сам перезапускает планирование.
-# Код не меняется: токен read-only по содержимому, у агента нет доступа к GitHub —
-# он пишет результат в файл, а комментарий и метки ставит воркфлоу.
+# Запускает мост (agent-bridge), когда в Linear на задачу поставили метку `agent:plan`
+# или владелец ответил на вопросы агента (метка `agent:questions`).
+# Агент читает код и пишет либо вопросы, либо план — результат уходит комментарием в Linear.
+#
+# Два задания намеренно: в первом работает агент — у него нет ни ключа Linear, ни
+# права менять код; второе публикует его файлы из чистой копии master, так что агент
+# не может подменить скрипт, который работает с ключом.
 
 on:
-  issues:
-    types: [opened, labeled]
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Задача Linear, например CRY-12"
+        required: true
+        type: string
+      force:
+        description: "Запустить, даже если на задаче нет метки agent:plan / agent:questions"
+        type: boolean
+        default: false
 
 concurrency:
-  group: agent-plan-${{ github.event.issue.number }}
+  group: agent-plan-${{ inputs.issue }}
   cancel-in-progress: true
+
+env:
+  ISSUE: ${{ inputs.issue }}
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
 jobs:
   plan:
-    # Запускает только владелец репозитория — напрямую или через Linear
-    # (linear[bot] действует только из вашего рабочего пространства Linear).
-    if: |
-      (github.event.sender.login == github.repository_owner || github.event.sender.login == 'linear[bot]') &&
-      (
-        (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'agent:plan') ||
-        (github.event_name == 'issues' && github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent:plan')) ||
-        (
-          github.event_name == 'issue_comment' &&
-          !github.event.issue.pull_request &&
-          contains(github.event.issue.labels.*.name, 'agent:questions') &&
-          !contains(github.event.comment.body, '@claude')
-        )
-      )
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
-      issues: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      REPO: ${{ github.repository }}
-      ISSUE: ${{ github.event.issue.number }}
-      OWNER: ${{ github.repository_owner }}
+    outputs:
+      go: ${{ steps.claim.outputs.go }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Собрать текст задачи (только владелец, Linear и агенты)
+      - name: Взять задачу из Linear
+        id: claim
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          FORCE: ${{ inputs.force }}
         run: |
-          mkdir -p .agent-context
-          gh api "repos/$REPO/issues/$ISSUE" \
-            --jq '"# " + .title + "\n\n" + (.body // "")' > .agent-context/task.md
-          gh api --paginate "repos/$REPO/issues/$ISSUE/comments" \
-            --jq '.[] | select(.user.login == env.OWNER or .user.login == "github-actions[bot]" or .user.login == "claude[bot]" or .user.login == "linear[bot]") | "\n\n---\nКомментарий " + .user.login + " (" + .created_at + "):\n\n" + .body' \
-            >> .agent-context/task.md
+          L="node .github/scripts/linear.mjs"
+          # Метка — это команда: снимаем её, когда берём задачу. Нет метки — задачу
+          # уже взял другой запуск (повторная доставка вебхука), выходим.
+          GO=$($L claim "$ISSUE" plan | sed -n 's/^go=//p')
+          if [ "$FORCE" = "true" ]; then GO=true; fi
+          echo "go=$GO" >> "$GITHUB_OUTPUT"
+          if [ "$GO" = "true" ]; then
+            mkdir -p .agent-context
+            $L fetch "$ISSUE" .agent-context/task.md
+          else
+            echo "На задаче нет метки agent:plan / agent:questions — пропускаю."
+          fi
 
       - uses: anthropics/claude-code-action@v1
+        if: steps.claim.outputs.go == 'true'
+        timeout-minutes: 15
         with:
           # Задайте ОДИН из двух секретов (см. docs/PIPELINE.md).
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Токен задания вместо токена приложения: права ровно те, что в permissions выше.
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Задачи, метки и комментарии из Linear приходят от имени его приложения.
-          allowed_bots: "linear[bot]"
           prompt: |
             Ты — планировщик. Выполни инструкцию из файла .claude/pipeline/plan.md.
             Текст задачи и переписка по ней лежат в .agent-context/task.md.
@@ -71,16 +75,50 @@ jobs:
             --max-turns 40
             --allowedTools "Read,Glob,Grep,Write"
 
-      - name: Опубликовать вопросы или план
-        if: always()
+      - name: Собрать результат
+        if: ${{ !cancelled() && steps.claim.outputs.go == 'true' }}
         run: |
-          if [ -s .agent-context/questions.md ] && [ ! -s .agent-context/plan.md ]; then
-            gh issue comment "$ISSUE" -R "$REPO" --body-file .agent-context/questions.md
-            gh issue edit "$ISSUE" -R "$REPO" --add-label "agent:questions"
-          elif [ -s .agent-context/plan.md ]; then
-            gh issue comment "$ISSUE" -R "$REPO" --body-file .agent-context/plan.md
-            gh issue edit "$ISSUE" -R "$REPO" --remove-label "agent:questions" || true
+          mkdir -p out
+          for f in questions.md plan.md; do
+            if [ -s ".agent-context/$f" ]; then head -c 100000 ".agent-context/$f" > "out/$f"; fi
+          done
+          touch out/.keep
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.claim.outputs.go == 'true' }}
+        with:
+          name: plan-result
+          path: out/
+          include-hidden-files: true
+          retention-days: 3
+
+  publish:
+    needs: plan
+    # Отменённый запуск (пришёл новый ответ владельца) ничего не публикует.
+    if: ${{ !cancelled() && needs.plan.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: plan-result
+          path: ${{ runner.temp }}/out
+      - name: Опубликовать вопросы или план в Linear
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          OUT: ${{ runner.temp }}/out
+        run: |
+          L="node .github/scripts/linear.mjs"
+          if [ -s "$OUT/questions.md" ] && [ ! -s "$OUT/plan.md" ]; then
+            $L comment "$ISSUE" "$OUT/questions.md"
+            $L label-add "$ISSUE" "agent:questions"
+          elif [ -s "$OUT/plan.md" ]; then
+            $L comment "$ISSUE" "$OUT/plan.md"
+            $L label-remove "$ISSUE" "agent:questions"
           else
-            gh issue comment "$ISSUE" -R "$REPO" --body "Планировщик не выдал результат. Подробности — в логе запуска: $GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID. Перезапуск: снимите и поставьте метку \`agent:plan\`."
+            $L say "$ISSUE" "Планировщик не выдал результат. [Лог запуска]($RUN_URL). Перезапуск: поставьте метку \`agent:plan\` ещё раз."
             exit 1
           fi

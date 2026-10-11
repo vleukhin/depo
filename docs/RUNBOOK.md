@@ -48,7 +48,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://depo-ivory.vercel.app/api/summa
 ## Чего агенты не делают
 
 - Не получают и не запрашивают `TURSO_AUTH_TOKEN`, ключи бирж, `APP_PASSWORD`,
-  `CRON_SECRET`, токен Vercel. В секретах GitHub Actions лежит только токен Claude.
+  `CRON_SECRET`, токен Vercel. В секретах GitHub Actions лежат только токен Claude и ключ Linear.
 - Не ходят в прод-базу и на биржи. Не вызывают `withdraw-gas` и `rent-energy`.
 - Не деплоят вручную и не меняют переменные окружения. Релиз = владелец мержит PR.
 
