@@ -1,7 +1,8 @@
 name: "Агент · 1 · План"
 
-# Запускает мост (agent-bridge), когда в Linear на задачу поставили метку `agent:plan`
-# или владелец ответил на вопросы агента (метка `agent:questions`).
+# Запускает мост (agent-bridge), когда в Linear задачу перевели в статус Planning
+# или владелец ответил на вопросы агента (задача в статусе Questions).
+# Итог: вопросы -> статус Questions, план -> статус Plan Review.
 # Агент читает код и пишет либо вопросы, либо план — результат уходит комментарием в Linear.
 #
 # Два задания намеренно: в первом работает агент — у него нет ни ключа Linear, ни
@@ -16,7 +17,7 @@ on:
         required: true
         type: string
       force:
-        description: "Запустить, даже если на задаче нет метки agent:plan / agent:questions"
+        description: "Запустить при любом статусе задачи"
         type: boolean
         default: false
 
@@ -46,8 +47,7 @@ jobs:
           FORCE: ${{ inputs.force }}
         run: |
           L="node .github/scripts/linear.mjs"
-          # Метка — это команда: снимаем её, когда берём задачу. Нет метки — задачу
-          # уже взял другой запуск (повторная доставка вебхука), выходим.
+          # Планируем только задачу в статусе Planning или Questions.
           GO=$($L claim "$ISSUE" plan | sed -n 's/^go=//p')
           if [ "$FORCE" = "true" ]; then GO=true; fi
           echo "go=$GO" >> "$GITHUB_OUTPUT"
@@ -55,7 +55,7 @@ jobs:
             mkdir -p .agent-context
             $L fetch "$ISSUE" .agent-context/task.md
           else
-            echo "На задаче нет метки agent:plan / agent:questions — пропускаю."
+            echo "Задача не в статусе Planning / Questions — пропускаю."
           fi
 
       - uses: anthropics/claude-code-action@v1
@@ -114,11 +114,11 @@ jobs:
           L="node .github/scripts/linear.mjs"
           if [ -s "$OUT/questions.md" ] && [ ! -s "$OUT/plan.md" ]; then
             $L comment "$ISSUE" "$OUT/questions.md"
-            $L label-add "$ISSUE" "agent:questions"
+            $L state "$ISSUE" questions
           elif [ -s "$OUT/plan.md" ]; then
             $L comment "$ISSUE" "$OUT/plan.md"
-            $L label-remove "$ISSUE" "agent:questions"
+            $L state "$ISSUE" review
           else
-            $L say "$ISSUE" "Планировщик не выдал результат. [Лог запуска]($RUN_URL). Перезапуск: поставьте метку \`agent:plan\` ещё раз."
+            $L say "$ISSUE" "Планировщик не выдал результат. [Лог запуска]($RUN_URL). Перезапуск: переведите задачу в другой статус и снова в Planning."
             exit 1
           fi

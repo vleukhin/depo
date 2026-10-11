@@ -1,6 +1,7 @@
 name: "Агент · 2 · Разработка"
 
-# Запускает мост (agent-bridge), когда в Linear на задачу поставили метку `agent:build`.
+# Запускает мост (agent-bridge), когда в Linear задачу перевели в статус Ready for Dev.
+# Статусы: взял в работу -> In Progress; PR открыт -> In Review; не дошло до PR -> Plan Review.
 # Агент берёт согласованный план из переписки по задаче, пишет код в ветке claude/…,
 # гоняет проверки и открывает PR. Ссылка на PR уходит комментарием в Linear.
 #
@@ -18,7 +19,7 @@ on:
         required: true
         type: string
       force:
-        description: "Запустить, даже если на задаче нет метки agent:build"
+        description: "Запустить при любом статусе задачи"
         type: boolean
         default: false
 
@@ -47,8 +48,8 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Первым делом, до установки зависимостей: чем раньше снята метка, тем меньше
-      # окно, в котором повторная доставка вебхука запустит вторую разработку.
+      # Первым делом, до установки зависимостей: задача сразу уходит из Ready for Dev
+      # в In Progress, и повторная доставка вебхука вторую разработку не запустит.
       - name: Взять задачу из Linear
         id: claim
         env:
@@ -64,7 +65,7 @@ jobs:
             $L fetch "$ISSUE" .agent-context/task.md
             $L say "$ISSUE" "Взял в разработку. [Ход работы]($RUN_URL)."
           else
-            echo "На задаче нет метки agent:build — её уже взял другой запуск, пропускаю."
+            echo "Задача не в статусе Ready for Dev — её уже взял другой запуск, пропускаю."
           fi
 
       - uses: actions/setup-node@v6
@@ -151,11 +152,11 @@ jobs:
           if [ -n "$PR" ]; then
             echo "PR готов: $PR — на нём идут CI и ревью отдельным агентом. Релиз — ваш merge." > "$MSG"
           else
-            echo "Разработка не дошла до PR. [Лог запуска]($RUN_URL). Повтор: поставьте метку \`agent:build\` ещё раз." > "$MSG"
+            echo "Разработка не дошла до PR. [Лог запуска]($RUN_URL). Задача возвращена в Plan Review; повтор — снова переведите её в Ready for Dev." > "$MSG"
           fi
           if [ -s "$OUT/result.md" ]; then
             printf '\n**Сообщение разработчика:**\n\n' >> "$MSG"
             cat "$OUT/result.md" >> "$MSG"
           fi
           $L comment "$ISSUE" "$MSG"
-          [ -n "$PR" ]
+          if [ -n "$PR" ]; then $L state "$ISSUE" pr; else $L state "$ISSUE" review; exit 1; fi

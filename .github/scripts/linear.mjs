@@ -7,10 +7,23 @@
 //   node linear.mjs fetch CRY-12 out.md         задача и переписка -> файл
 //   node linear.mjs comment CRY-12 body.md      комментарий из файла
 //   node linear.mjs say CRY-12 "текст"          короткий комментарий
-//   node linear.mjs label-add CRY-12 имя
-//   node linear.mjs label-remove CRY-12 имя
+//   node linear.mjs state CRY-12 questions      перевести в статус (ключ из STATUS)
 import { readFile, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+
+/**
+ * Статусы задач Linear, которыми управляется конвейер (без учёта регистра).
+ * Первые три совпадают с `STATUS` в мосте agent-bridge (src/core.ts) — меняйте вместе.
+ */
+export const STATUS = {
+  plan: "Planning", // владелец: «спланируй» — триггер
+  questions: "Questions", // агент ждёт ответа; комментарий владельца перезапускает план
+  build: "Ready for Dev", // владелец: «план согласован» — триггер
+  review: "Plan Review", // план готов, ждёт решения владельца
+  working: "In Progress", // агент разрабатывает
+  pr: "In Review", // PR открыт
+};
+const same = (a, b) => (a ?? "").trim().toLowerCase() === b.toLowerCase();
 
 /** Маркер комментариев агентов: по нему мост отличает их от ваших (ключ-то один). */
 export const BOT_MARKER = "🤖";
@@ -57,7 +70,8 @@ async function getIssue(id) {
     `query($id: String!) {
       issue(id: $id) {
         id identifier title description url
-        labels { nodes { id name } }
+        state { name }
+        team { states { nodes { id name } } }
         comments(first: 250) { nodes { body createdAt user { name } } }
       }
     }`,
@@ -66,19 +80,16 @@ async function getIssue(id) {
   return issue;
 }
 
-async function labelId(name) {
-  const { issueLabels } = await gql(`query { issueLabels(first: 250) { nodes { id name } } }`, {});
-  return issueLabels.nodes.find((l) => l.name.toLowerCase() === name.toLowerCase())?.id ?? null;
-}
-
-async function removeLabel(issue, name) {
-  const has = issue.labels.nodes.find((l) => l.name.toLowerCase() === name.toLowerCase());
-  if (!has) return false;
-  await gql(`mutation($id: String!, $labelId: String!) { issueRemoveLabel(id: $id, labelId: $labelId) { success } }`, {
+async function setState(issue, key) {
+  const name = STATUS[key];
+  if (!name) throw new Error(`Неизвестный ключ статуса: ${key}`);
+  if (same(issue.state?.name, name)) return;
+  const target = issue.team.states.nodes.find((st) => same(st.name, name));
+  if (!target) throw new Error(`В команде Linear нет статуса «${name}» — создайте его (см. docs/PIPELINE.md)`);
+  await gql(`mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`, {
     id: issue.id,
-    labelId: has.id,
+    input: { stateId: target.id },
   });
-  return true;
 }
 
 async function comment(id, text) {
@@ -91,61 +102,43 @@ async function comment(id, text) {
 }
 
 /**
- * Какие метки дают право начать этап. Метка-триггер снимается здесь же: повторная
- * доставка вебхука или второй запуск увидят, что задачу уже взяли, и остановятся.
+ * Можно ли начинать этап при текущем статусе задачи и куда её перевести.
+ * Разработка сразу уводит задачу из статуса-триггера: повторная доставка вебхука
+ * или второй запуск увидят, что её уже взяли, и остановятся.
  */
-export function claimPlan(labelNames) {
-  const has = new Set(labelNames.map((l) => l.toLowerCase()));
-  if (has.has("agent:plan")) return { go: true, remove: ["agent:plan"] };
-  if (has.has("agent:questions")) return { go: true, remove: [] };
-  return { go: false, remove: [] };
-}
-export function claimBuild(labelNames) {
-  const has = new Set(labelNames.map((l) => l.toLowerCase()));
-  if (!has.has("agent:build")) return { go: false, remove: [] };
-  // Вопросы больше не ждут ответа: иначе любой комментарий перезапускал бы планирование.
-  return { go: true, remove: ["agent:build", "agent:questions"] };
+export function claim(stage, stateName) {
+  if (stage === "plan") {
+    // Статус не трогаем: смена Questions -> Planning сама была бы новым триггером.
+    return { go: same(stateName, STATUS.plan) || same(stateName, STATUS.questions), moveTo: null };
+  }
+  if (stage === "build") {
+    return same(stateName, STATUS.build) ? { go: true, moveTo: "working" } : { go: false, moveTo: null };
+  }
+  throw new Error(`Неизвестный этап: ${stage}`);
 }
 
 async function main([cmd, rawId, arg]) {
   const id = assertIssueId(rawId);
   switch (cmd) {
     case "claim": {
-      if (arg !== "plan" && arg !== "build") throw new Error(`Неизвестный этап: ${arg}`);
       const issue = await getIssue(id);
-      const names = issue.labels.nodes.map((l) => l.name);
-      const { go, remove } = arg === "plan" ? claimPlan(names) : claimBuild(names);
-      for (const name of remove) await removeLabel(issue, name);
+      const { go, moveTo } = claim(arg, issue.state?.name);
+      if (go && moveTo) await setState(issue, moveTo);
       console.log(`go=${go}`);
       return;
     }
     case "fetch": {
       const issue = await getIssue(id);
       await writeFile(arg, renderTask(issue));
-      console.log(`${issue.identifier}: ${issue.comments.nodes.length} коммент., метки: ${issue.labels.nodes.map((l) => l.name).join(", ") || "—"}`);
+      console.log(`${issue.identifier}: статус «${issue.state?.name ?? "—"}», ${issue.comments.nodes.length} коммент.`);
       return;
     }
     case "comment":
       return comment(id, await readFile(arg, "utf8"));
     case "say":
       return comment(id, arg);
-    case "label-add":
-    case "label-remove": {
-      const issue = await getIssue(id);
-      const has = issue.labels.nodes.find((l) => l.name.toLowerCase() === arg.toLowerCase());
-      if (cmd === "label-remove") {
-        await removeLabel(issue, arg);
-        return;
-      }
-      if (has) return;
-      const lid = await labelId(arg);
-      if (!lid) throw new Error(`В Linear нет метки «${arg}»`);
-      await gql(`mutation($id: String!, $labelId: String!) { issueAddLabel(id: $id, labelId: $labelId) { success } }`, {
-        id: issue.id,
-        labelId: lid,
-      });
-      return;
-    }
+    case "state":
+      return setState(await getIssue(id), arg);
     default:
       throw new Error(`Неизвестная команда: ${cmd}`);
   }
