@@ -1,0 +1,60 @@
+name: "Агент · 1 · План"
+
+# Задача с меткой `agent:plan` -> агент читает код и пишет план в комментарий.
+# Код не меняется: токен read-only по содержимому, инструменты только на чтение.
+
+on:
+  issues:
+    types: [opened, labeled]
+
+concurrency:
+  group: agent-plan-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    # Запускает только владелец репозитория (репозиторий публичный).
+    if: |
+      github.event.sender.login == github.repository_owner &&
+      (
+        (github.event.action == 'labeled' && github.event.label.name == 'agent:plan') ||
+        (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent:plan'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Собрать текст задачи (только владелец и агенты)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          mkdir -p .agent-context
+          gh api "repos/$REPO/issues/$ISSUE" \
+            --jq '"# " + .title + "\n\n" + (.body // "")' > .agent-context/task.md
+          gh api --paginate "repos/$REPO/issues/$ISSUE/comments" \
+            --jq '.[] | select(.user.login == env.OWNER or .user.login == "github-actions[bot]" or .user.login == "claude[bot]") | "\n\n---\nКомментарий " + .user.login + " (" + .created_at + "):\n\n" + .body' \
+            >> .agent-context/task.md
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # Задайте ОДИН из двух секретов (см. docs/PIPELINE.md).
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Токен задания вместо токена приложения: права ровно те, что в permissions выше.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE: ${{ github.event.issue.number }}
+
+            Ты — планировщик. Выполни инструкцию из файла .claude/pipeline/plan.md.
+            Текст задачи лежит в .agent-context/task.md.
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Bash(gh issue comment:*)"

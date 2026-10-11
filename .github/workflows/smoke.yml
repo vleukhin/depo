@@ -1,0 +1,27 @@
+name: Smoke после деплоя
+
+# Vercel сообщает GitHub об успешном production-деплое -> проверяем, что прод отвечает.
+
+on:
+  deployment_status:
+
+permissions: {}
+
+jobs:
+  smoke:
+    if: |
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Страница входа отвечает 200, API без сессии — 401
+        env:
+          URL: ${{ github.event.deployment_status.environment_url }}
+        run: |
+          set -eu
+          login=$(curl -sS -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 5 "$URL/login")
+          api=$(curl -sS -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 5 "$URL/api/summary")
+          echo "login=$login api=$api"
+          test "$login" = "200"
+          test "$api" = "401"

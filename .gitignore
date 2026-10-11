@@ -40,3 +40,6 @@ yarn-error.log*
 # misc
 *.pem
 .vercel
+
+# рабочий контекст агентов в CI (текст задачи) — не коммитить
+/.agent-context/
