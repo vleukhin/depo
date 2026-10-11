@@ -1,0 +1,55 @@
+name: "Агент · Доработка по @claude"
+
+# Владелец пишет в задаче или PR комментарий с @claude — агент отвечает
+# или дорабатывает ветку PR (например: «@claude поправь замечания ревью»).
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: agent-mention-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  respond:
+    if: |
+      (github.event.sender.login == github.repository_owner || github.event.sender.login == 'linear[bot]') &&
+      (
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name != 'pull_request_review' && contains(github.event.comment.body, '@claude'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          allowed_bots: "linear[bot]"
+          include_comments_by_actor: "${{ github.repository_owner }},github-actions[bot],claude[bot],linear[bot]"
+          additional_permissions: |
+            actions: read
+          claude_args: |
+            --max-turns 120
+            --append-system-prompt "Соблюдай правила из .claude/pipeline/build.md (раздел «Жёсткие правила»)."
+            --allowedTools "Bash(npm run lint),Bash(npm run typecheck),Bash(npm test),Bash(npm test:*),Bash(npm run build),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr diff:*)"

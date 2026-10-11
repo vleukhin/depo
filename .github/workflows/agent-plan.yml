@@ -1,0 +1,86 @@
+name: "Агент · 1 · План"
+
+# Задача с меткой `agent:plan` -> агент читает код и либо задаёт уточняющие вопросы
+# (метка `agent:questions`), либо пишет план. Ответ владельца комментарием в задаче
+# с меткой `agent:questions` сам перезапускает планирование.
+# Код не меняется: токен read-only по содержимому, у агента нет доступа к GitHub —
+# он пишет результат в файл, а комментарий и метки ставит воркфлоу.
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: agent-plan-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    # Запускает только владелец репозитория — напрямую или через Linear
+    # (linear[bot] действует только из вашего рабочего пространства Linear).
+    if: |
+      (github.event.sender.login == github.repository_owner || github.event.sender.login == 'linear[bot]') &&
+      (
+        (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'agent:plan') ||
+        (github.event_name == 'issues' && github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'agent:plan')) ||
+        (
+          github.event_name == 'issue_comment' &&
+          !github.event.issue.pull_request &&
+          contains(github.event.issue.labels.*.name, 'agent:questions') &&
+          !contains(github.event.comment.body, '@claude')
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      ISSUE: ${{ github.event.issue.number }}
+      OWNER: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Собрать текст задачи (только владелец, Linear и агенты)
+        run: |
+          mkdir -p .agent-context
+          gh api "repos/$REPO/issues/$ISSUE" \
+            --jq '"# " + .title + "\n\n" + (.body // "")' > .agent-context/task.md
+          gh api --paginate "repos/$REPO/issues/$ISSUE/comments" \
+            --jq '.[] | select(.user.login == env.OWNER or .user.login == "github-actions[bot]" or .user.login == "claude[bot]" or .user.login == "linear[bot]") | "\n\n---\nКомментарий " + .user.login + " (" + .created_at + "):\n\n" + .body' \
+            >> .agent-context/task.md
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          # Задайте ОДИН из двух секретов (см. docs/PIPELINE.md).
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Токен задания вместо токена приложения: права ровно те, что в permissions выше.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Задачи, метки и комментарии из Linear приходят от имени его приложения.
+          allowed_bots: "linear[bot]"
+          prompt: |
+            Ты — планировщик. Выполни инструкцию из файла .claude/pipeline/plan.md.
+            Текст задачи и переписка по ней лежат в .agent-context/task.md.
+            Результат запиши в .agent-context/questions.md ИЛИ в .agent-context/plan.md.
+          claude_args: |
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Write"
+
+      - name: Опубликовать вопросы или план
+        if: always()
+        run: |
+          if [ -s .agent-context/questions.md ] && [ ! -s .agent-context/plan.md ]; then
+            gh issue comment "$ISSUE" -R "$REPO" --body-file .agent-context/questions.md
+            gh issue edit "$ISSUE" -R "$REPO" --add-label "agent:questions"
+          elif [ -s .agent-context/plan.md ]; then
+            gh issue comment "$ISSUE" -R "$REPO" --body-file .agent-context/plan.md
+            gh issue edit "$ISSUE" -R "$REPO" --remove-label "agent:questions" || true
+          else
+            gh issue comment "$ISSUE" -R "$REPO" --body "Планировщик не выдал результат. Подробности — в логе запуска: $GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID. Перезапуск: снимите и поставьте метку \`agent:plan\`."
+            exit 1
+          fi

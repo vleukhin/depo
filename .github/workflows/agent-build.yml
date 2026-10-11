@@ -1,0 +1,54 @@
+name: "Агент · 2 · Разработка"
+
+# Владелец согласовал план и поставил метку `agent:build` ->
+# агент делает ветку claude/..., пишет код, гоняет проверки и открывает PR.
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: agent-build-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: |
+      github.event.label.name == 'agent:build' &&
+      (github.event.sender.login == github.repository_owner || github.event.sender.login == 'linear[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      # Зависимости ставит воркфлоу, а не агент: у агента нет `npm install`,
+      # новые пакеты появляются только после вашего решения.
+      - run: npm ci
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          # В контекст попадают только комментарии владельца и агентов.
+          allowed_bots: "linear[bot]"
+          include_comments_by_actor: "${{ github.repository_owner }},github-actions[bot],claude[bot],linear[bot]"
+          additional_permissions: |
+            actions: read
+          prompt: |
+            Ты — разработчик. Выполни инструкцию из файла .claude/pipeline/build.md.
+            Реализуй последний согласованный план из комментариев к этой задаче.
+          claude_args: |
+            --max-turns 120
+            --allowedTools "Bash(npm run lint),Bash(npm run typecheck),Bash(npm test),Bash(npm test:*),Bash(npm run build),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr list:*)"

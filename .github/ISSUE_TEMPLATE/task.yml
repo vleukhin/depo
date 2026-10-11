@@ -1,0 +1,26 @@
+name: Задача для агентов
+description: Задача сразу уходит в планирование (метка agent:plan)
+labels: ["agent:plan"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Что сделать
+      description: Своими словами. Скриншоты и примеры приветствуются.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Зачем
+      description: Какую проблему решаем — это помогает агенту выбрать правильное решение.
+  - type: textarea
+    id: done
+    attributes:
+      label: Как понять, что готово
+      description: Критерии приёмки — что проверить руками после выкладки.
+  - type: textarea
+    id: limits
+    attributes:
+      label: Что не трогать
+      description: Ограничения, если есть.

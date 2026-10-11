@@ -16,11 +16,17 @@ npm run dev      # dev server at http://localhost:3000
 npm run build    # production build
 npm run start    # serve production build
 npm run lint     # ESLint (flat config, eslint-config-next core-web-vitals + typescript)
+npm run typecheck  # next typegen + tsc --noEmit (RouteContext/PageProps types are generated)
+npm test         # vitest, unit tests in src/lib/__tests__/*.test.ts (node env, no network)
 ```
 
-There is no test framework configured.
+All four checks (lint, typecheck, test, build) run in CI on every PR (`.github/workflows/ci.yml`). New or changed logic in `src/lib/` gets a vitest test.
 
 Before running: copy `.env.example` to `.env`. `APP_PASSWORD` is mandatory — without it login is completely closed. `AUTH_SECRET` signs session cookies; `TRONGRID_API_KEY` is optional (raises TronGrid rate limits); `BSC_RPC_URL`/`ETH_RPC_URL` override the default public EVM nodes; `NODEREAL_API_KEY` (NodeReal MegaNode, one key for both EVM chains) is required only for USDT transfer history in BSC/Ethereum; `KUCOIN_*`/`BITGET_*` (key/secret/passphrase) enable exchange balance checks; `TRONRENTAL_API_KEY` (optional) enables renting TRON energy/bandwidth via TronRental from the gas top-up dialog; `EXCHANGE_PROXY_URL` (optional) routes **only** the exchange (Bitget/KuCoin) requests through an HTTP(S) proxy with a static IP so it can be whitelisted on the exchange key (TronGrid/Telegram/DB stay direct); for an HTTPS proxy with a self-signed cert on a bare IP, `EXCHANGE_PROXY_CA` (PEM, pinned) and `EXCHANGE_PROXY_SERVERNAME` (the cert's SAN label — undici can't SNI a bare IP) are also read — see `lib/proxy.ts` and the "Static IP" section in `DEPLOY.md`. **Database**: with `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` set the app uses Turso (prod); unset, it falls back to a local SQLite file at `DB_PATH` (default `data/depo.db`, auto-created, gitignored) — the normal dev setup. See `DEPLOY.md` for the Vercel + Turso deploy.
+
+## Agent pipeline
+
+Tasks live in Linear (team Depo, two-way synced with GitHub Issues); agents run in GitHub Actions in stages — plan (`agent:plan` label) → build (`agent:build`) → review (automatic on `claude/**` PRs) → the owner merges, Vercel deploys. How it works and one-time setup: `docs/PIPELINE.md`. Per-stage instructions for agents: `.claude/pipeline/{plan,build,review}.md`. Where the app is deployed and how to check it: `docs/RUNBOOK.md`.
 
 ## Next.js 16 specifics used here
 
