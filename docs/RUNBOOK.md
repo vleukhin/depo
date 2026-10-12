@@ -13,6 +13,7 @@
 | Ежедневный снимок | Vercel Cron, `GET /api/cron/snapshot`, 20:00 UTC | `vercel.json` |
 | Telegram-бот | вебхук `POST /api/telegram` | регистрируется вручную, см. `DEPLOY.md` |
 | Прокси для бирж | свой VPS (tinyproxy + stunnel), статический IP в whitelist Bitget | настраивается вручную, см. `DEPLOY.md` |
+| Мост Linear → Actions | отдельный проект Vercel из `vleukhin/agent-bridge`, `POST /api/linear` | автодеплой при пуше в его `master`; к приложению и его данным доступа не имеет |
 | Секреты | только Vercel → Settings → Environment Variables | вводит владелец |
 
 Серверов с SSH у самого приложения нет: «зайти на сервер» здесь означает посмотреть
