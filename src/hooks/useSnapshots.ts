@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { DepoSnapshot, DepoSnapshotDetail } from "@/types";
+import type { DepoSnapshot, DepoSnapshotDetail, SnapshotComparison } from "@/types";
 import type { SnapshotInput } from "@/lib/validate";
 
 /** Список снимков депо (без содержимого блоков), свежие сверху. */
@@ -16,6 +16,17 @@ export function useSnapshot(id: number) {
   return useQuery({
     queryKey: ["snapshots", id],
     queryFn: () => api.get<DepoSnapshotDetail>(`/api/snapshots/${id}`),
+  });
+}
+
+/** Сравнение снимка с другим снимком или текущим депо (`target` = "current" | id). */
+export function useSnapshotDiff(id: number, target: string) {
+  return useQuery({
+    queryKey: ["snapshots", id, "diff", target],
+    queryFn: () =>
+      api.get<SnapshotComparison>(
+        `/api/snapshots/${id}/diff?with=${encodeURIComponent(target)}`,
+      ),
   });
 }
 

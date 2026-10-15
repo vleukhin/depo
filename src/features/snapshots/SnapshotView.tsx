@@ -18,24 +18,14 @@ import { ReconciliationPill } from "@/components/ReconciliationPill";
 import { ACCOUNT_LABELS } from "@/features/placements/PlacementForm";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useSnapshot } from "@/hooks/useSnapshots";
+import { StatTile } from "@/features/snapshots/StatTile";
+import { CompareSelect } from "@/features/snapshots/CompareSelect";
 import type { Debt } from "@/types";
 
 function sourceLabel(debt: Debt): string | null {
   if (debt.placement_name) return debt.placement_name;
   if (debt.source_text) return debt.source_text;
   return null;
-}
-
-/** Итоговая плитка снимка: подпись + сумма. */
-function StatTile({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Card className="shadow-card">
-      <CardContent className="space-y-1">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        {children}
-      </CardContent>
-    </Card>
-  );
 }
 
 /** Полный снимок депо: итоги и замороженные копии всех блоков на момент создания. */
@@ -60,6 +50,9 @@ export function SnapshotView({ id }: { id: number }) {
           Создан {formatDateTime(snapshot.created_at)}
         </span>
         <ReconciliationPill balanced={snapshot.balanced} diff={snapshot.diff} />
+        <div className="sm:ml-auto">
+          <CompareSelect id={snapshot.id} />
+        </div>
       </div>
       {snapshot.comment && <p className="text-sm text-muted-foreground">{snapshot.comment}</p>}
 
