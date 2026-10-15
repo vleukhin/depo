@@ -25,6 +25,7 @@ import type {
   DebtsSummaryRow,
   DepoSnapshot,
   DepoSnapshotDetail,
+  DepoState,
   TransferDebtRef,
 } from "@/types";
 import type {
@@ -810,30 +811,56 @@ const toDepoSnapshot = (r: Row): DepoSnapshot => {
   };
 };
 
-/** Создаёт снимок текущего состояния депо: итоги + замороженные копии всех блоков. */
-export async function createDepoSnapshot(input: SnapshotInput): Promise<DepoSnapshotDetail> {
-  // В снимок входят активные записи — ровно то, что пользователь видит на дашборде.
+/** Текущие блоки депо + итоги в micro — общая основа снимка и сравнения с «сейчас». */
+async function collectDepo() {
+  // Активные записи — ровно то, что пользователь видит на дашборде.
   const [funds, placements, debts] = await Promise.all([
     listFunds(),
     listPlacements(),
     listDebts(),
   ]);
-  // Итоги считаем по тем же строкам, что уходят в data, — снимок внутренне согласован.
+  // Итоги считаем по тем же строкам, что уходят в блоки, — состояние внутренне согласовано.
   const sum = (rows: { amount: number }[]) => rows.reduce((s, r) => s + toMicro(r.amount), 0);
-  const totalNative = zeroByChain();
+  const native = zeroByChain();
   for (const p of placements) {
-    if (p.native_amount !== null) totalNative[p.chain] += toMicro(p.native_amount);
+    if (p.native_amount !== null) native[p.chain] += toMicro(p.native_amount);
   }
+  return {
+    blocks: { funds, placements, debts },
+    micro: { funds: sum(funds), placements: sum(placements), debts: sum(debts), native },
+  };
+}
+
+/** Текущее состояние депо в той же форме, что и снимок (для сравнения со снимком). */
+export async function getCurrentDepoState(): Promise<DepoState> {
+  const { blocks, micro } = await collectDepo();
+  const diff = micro.placements + micro.debts - micro.funds;
+  const totalNative = zeroByChain();
+  for (const chain of CHAINS) totalNative[chain] = fromMicro(micro.native[chain]);
+  return {
+    ...blocks,
+    total_funds: fromMicro(micro.funds),
+    total_placements: fromMicro(micro.placements),
+    total_debts: fromMicro(micro.debts),
+    total_native: totalNative,
+    diff: fromMicro(diff),
+    balanced: diff === 0,
+  };
+}
+
+/** Создаёт снимок текущего состояния депо: итоги + замороженные копии всех блоков. */
+export async function createDepoSnapshot(input: SnapshotInput): Promise<DepoSnapshotDetail> {
+  const { blocks, micro } = await collectDepo();
   const db = await getClient();
   const rs = await db.execute({
     sql: "INSERT INTO depo_snapshots (comment, total_funds, total_placements, total_debts, total_native, data) VALUES (?, ?, ?, ?, ?, ?)",
     args: [
       input.comment,
-      sum(funds),
-      sum(placements),
-      sum(debts),
-      JSON.stringify(totalNative),
-      JSON.stringify({ funds, placements, debts }),
+      micro.funds,
+      micro.placements,
+      micro.debts,
+      JSON.stringify(micro.native),
+      JSON.stringify(blocks),
     ],
   });
   return (await getDepoSnapshot(Number(rs.lastInsertRowid)))!;

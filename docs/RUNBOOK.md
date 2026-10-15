@@ -13,6 +13,7 @@
 | Ежедневный снимок | Vercel Cron, `GET /api/cron/snapshot`, 20:00 UTC | `vercel.json` |
 | Telegram-бот | вебхук `POST /api/telegram` | регистрируется вручную, см. `DEPLOY.md` |
 | Прокси для бирж | свой VPS (tinyproxy + stunnel), статический IP в whitelist Bitget | настраивается вручную, см. `DEPLOY.md` |
+| Мост Linear → Actions | отдельный проект Vercel из `vleukhin/agent-bridge`, `POST /api/linear` | автодеплой при пуше в его `master`; к приложению и его данным доступа не имеет |
 | Секреты | только Vercel → Settings → Environment Variables | вводит владелец |
 
 Серверов с SSH у самого приложения нет: «зайти на сервер» здесь означает посмотреть
@@ -48,7 +49,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://depo-ivory.vercel.app/api/summa
 ## Чего агенты не делают
 
 - Не получают и не запрашивают `TURSO_AUTH_TOKEN`, ключи бирж, `APP_PASSWORD`,
-  `CRON_SECRET`, токен Vercel. В секретах GitHub Actions лежит только токен Claude.
+  `CRON_SECRET`, токен Vercel. В секретах GitHub Actions лежат только токен Claude и ключ Linear.
 - Не ходят в прод-базу и на биржи. Не вызывают `withdraw-gas` и `rent-energy`.
 - Не деплоят вручную и не меняют переменные окружения. Релиз = владелец мержит PR.
 

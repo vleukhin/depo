@@ -1,54 +1,162 @@
 name: "Агент · 2 · Разработка"
 
-# Владелец согласовал план и поставил метку `agent:build` ->
-# агент делает ветку claude/..., пишет код, гоняет проверки и открывает PR.
+# Запускает мост (agent-bridge), когда в Linear задачу перевели в статус Ready for Dev.
+# Статусы: взял в работу -> In Progress; PR открыт -> In Review; не дошло до PR -> Plan Review.
+# Агент берёт согласованный план из переписки по задаче, пишет код в ветке claude/…,
+# гоняет проверки и открывает PR. Ссылка на PR уходит комментарием в Linear.
+#
+# Агент на этом этапе выполняет код проекта (тесты, сборку), поэтому считаем, что он
+# может всё, что может задание: ключа Linear в его задании после старта агента нет,
+# а отчёт публикует отдельное задание из чистой копии master.
+# Защита ветки master в настройках репозитория обязательна — список разрешённых
+# команд агента её не заменяет.
 
 on:
-  issues:
-    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Задача Linear, например CRY-12"
+        required: true
+        type: string
+      force:
+        description: "Запустить при любом статусе задачи"
+        type: boolean
+        default: false
 
 concurrency:
-  group: agent-build-${{ github.event.issue.number }}
+  group: agent-build-${{ inputs.issue }}
   cancel-in-progress: false
+
+env:
+  ISSUE: ${{ inputs.issue }}
+  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
 jobs:
   build:
-    if: |
-      github.event.label.name == 'agent:build' &&
-      (github.event.sender.login == github.repository_owner || github.event.sender.login == 'linear[bot]')
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     permissions:
       contents: write
       pull-requests: write
-      issues: write
       id-token: write
       actions: read
+    outputs:
+      go: ${{ steps.claim.outputs.go }}
+      branch: ${{ steps.branch.outputs.name }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
+
+      # Первым делом, до установки зависимостей: задача сразу уходит из Ready for Dev
+      # в In Progress, и повторная доставка вебхука вторую разработку не запустит.
+      - name: Взять задачу из Linear
+        id: claim
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          L="node .github/scripts/linear.mjs"
+          GO=$($L claim "$ISSUE" build | sed -n 's/^go=//p')
+          if [ "$FORCE" = "true" ]; then GO=true; fi
+          echo "go=$GO" >> "$GITHUB_OUTPUT"
+          if [ "$GO" = "true" ]; then
+            mkdir -p .agent-context
+            $L fetch "$ISSUE" .agent-context/task.md
+            $L say "$ISSUE" "Взял в разработку. [Ход работы]($RUN_URL)."
+          else
+            echo "Задача не в статусе Ready for Dev — её уже взял другой запуск, пропускаю."
+          fi
+
       - uses: actions/setup-node@v6
+        if: steps.claim.outputs.go == 'true'
         with:
           node-version: 22
           cache: npm
       # Зависимости ставит воркфлоу, а не агент: у агента нет `npm install`,
       # новые пакеты появляются только после вашего решения.
       - run: npm ci
+        if: steps.claim.outputs.go == 'true'
+
+      - name: Создать ветку
+        id: branch
+        if: steps.claim.outputs.go == 'true'
+        run: |
+          git config user.name "claude[bot]"
+          git config user.email "41898282+claude[bot]@users.noreply.github.com"
+          # Идентификатор задачи в имени ветки — по нему Linear сам привяжет PR к задаче.
+          BRANCH="claude/$(printf '%s' "$ISSUE" | tr '[:upper:]' '[:lower:]')-${{ github.run_number }}-${{ github.run_attempt }}"
+          git checkout -b "$BRANCH"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - uses: anthropics/claude-code-action@v1
+        if: steps.claim.outputs.go == 'true'
+        timeout-minutes: 55
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          track_progress: true
-          # В контекст попадают только комментарии владельца и агентов.
-          allowed_bots: "linear[bot]"
-          include_comments_by_actor: "${{ github.repository_owner }},github-actions[bot],claude[bot],linear[bot]"
-          additional_permissions: |
-            actions: read
           prompt: |
+            REPO: ${{ github.repository }}
+            ЗАДАЧА: ${{ inputs.issue }}
+            ВЕТКА: ${{ steps.branch.outputs.name }} (уже создана и выбрана)
+
             Ты — разработчик. Выполни инструкцию из файла .claude/pipeline/build.md.
-            Реализуй последний согласованный план из комментариев к этой задаче.
+            Задача, переписка и согласованный план лежат в .agent-context/task.md.
           claude_args: |
             --max-turns 120
-            --allowedTools "Bash(npm run lint),Bash(npm run typecheck),Bash(npm test),Bash(npm test:*),Bash(npm run build),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr list:*)"
+            --allowedTools "Read,Glob,Grep,Edit,Write,Bash(npm run lint),Bash(npm run typecheck),Bash(npm test),Bash(npm test:*),Bash(npm run build),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git push origin ${{ steps.branch.outputs.name }}),Bash(git push -u origin ${{ steps.branch.outputs.name }}),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr list:*)"
+
+      - name: Собрать сообщение агента
+        if: ${{ !cancelled() && steps.claim.outputs.go == 'true' }}
+        run: |
+          mkdir -p out
+          if [ -s .agent-context/result.md ]; then head -c 20000 .agent-context/result.md > out/result.md; fi
+          touch out/.keep
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.claim.outputs.go == 'true' }}
+        with:
+          name: build-result
+          path: out/
+          include-hidden-files: true
+          retention-days: 3
+
+  report:
+    needs: build
+    if: ${{ !cancelled() && needs.build.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: build-result
+          path: ${{ runner.temp }}/out
+      - name: Сообщить результат в Linear
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.build.outputs.branch }}
+          REPO: ${{ github.repository }}
+          OUT: ${{ runner.temp }}/out
+        run: |
+          L="node .github/scripts/linear.mjs"
+          PR=""
+          if [ -n "$BRANCH" ]; then
+            PR=$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json url --jq '.[0].url // ""' || true)
+          fi
+          MSG="$RUNNER_TEMP/msg.md"
+          if [ -n "$PR" ]; then
+            echo "PR готов: $PR — на нём идут CI и ревью отдельным агентом. Релиз — ваш merge." > "$MSG"
+          else
+            echo "Разработка не дошла до PR. [Лог запуска]($RUN_URL). Задача возвращена в Plan Review; повтор — снова переведите её в Ready for Dev." > "$MSG"
+          fi
+          if [ -s "$OUT/result.md" ]; then
+            printf '\n**Сообщение разработчика:**\n\n' >> "$MSG"
+            cat "$OUT/result.md" >> "$MSG"
+          fi
+          $L comment "$ISSUE" "$MSG"
+          if [ -n "$PR" ]; then $L state "$ISSUE" pr; else $L state "$ISSUE" review; exit 1; fi

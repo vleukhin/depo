@@ -226,24 +226,81 @@ export interface Summary {
   balanced: boolean;
 }
 
-// Снимок состояния депо: строка списка (итоги без содержимого блоков).
-export interface DepoSnapshot {
-  id: number;
-  comment: string | null;
+// Итоги депо: общие для снимка и текущего состояния.
+export interface DepoTotals {
   total_funds: number;
   total_placements: number;
   total_debts: number;
   total_native: Record<Chain, number>; // суммарный газ по сетям (информационно)
-  diff: number; // (свободные средства + долги) − депо на момент снимка
+  diff: number; // (свободные средства + долги) − депо
   balanced: boolean;
+}
+
+// Содержимое блоков депо — замороженное в снимке или текущее.
+export interface DepoBlocks {
+  funds: Fund[];
+  placements: Placement[];
+  debts: Debt[];
+}
+
+// Состояние депо целиком: итоги + блоки. Вход сравнения снимков.
+export type DepoState = DepoTotals & DepoBlocks;
+
+// Снимок состояния депо: строка списка (итоги без содержимого блоков).
+export interface DepoSnapshot extends DepoTotals {
+  id: number;
+  comment: string | null;
   created_at: string; // UTC-момент создания снимка
 }
 
 // Полный снимок: замороженные копии всех блоков на момент создания.
-export interface DepoSnapshotDetail extends DepoSnapshot {
-  funds: Fund[];
-  placements: Placement[];
-  debts: Debt[];
+export interface DepoSnapshotDetail extends DepoSnapshot, DepoBlocks {}
+
+// --- Сравнение снимков (diff) ---
+
+// Как показывать значение поля: сумма USDT, газ своей сети, дата или текст.
+export type DiffFieldKind = "usdt" | "gas" | "date" | "text";
+
+// Изменение одного поля записи. Значения — уже для показа (текст или число).
+export interface FieldChange {
+  field: string; // ключ поля записи
+  label: string; // подпись поля в интерфейсе
+  kind: DiffFieldKind;
+  before: string | number | null;
+  after: string | number | null;
+  delta: number | null; // стало − было для сумм; null — не применимо
+  chain: Chain | null; // сеть монеты для kind = 'gas'
+}
+
+export interface EntityChange<T> {
+  id: number;
+  before: T;
+  after: T;
+  fields: FieldChange[];
+}
+
+// Разница одного блока: записи сопоставляются по id.
+export interface EntityDiff<T> {
+  added: T[]; // есть только в «стало»
+  removed: T[]; // есть только в «было» (удалены или в архиве)
+  changed: EntityChange<T>[];
+  unchanged: number;
+}
+
+// Разница двух состояний депо: итоги «было/стало», их дельты и изменения по блокам.
+export interface DepoDiff {
+  before: DepoTotals;
+  after: DepoTotals;
+  delta: Omit<DepoTotals, "balanced">; // стало − было
+  funds: EntityDiff<Fund>;
+  placements: EntityDiff<Placement>;
+  debts: EntityDiff<Debt>;
+}
+
+// Ответ GET /api/snapshots/[id]/diff: снимок-база против другого снимка или текущего депо.
+export interface SnapshotComparison extends DepoDiff {
+  base: DepoSnapshot;
+  target: DepoSnapshot | null; // null — текущее состояние депо
 }
 
 // Снимок суммарного газа одной сети за день. Сумма — в десятичных монетах.
