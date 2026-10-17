@@ -66,7 +66,7 @@ const state = (blocks: Partial<DepoState> = {}): DepoState => ({
   total_funds: 0,
   total_placements: 0,
   total_debts: 0,
-  total_native: { tron: 0, bsc: 0, ethereum: 0 },
+  total_native: { tron: 0, bsc: 0, ethereum: 0, arbitrum: 0 },
   diff: 0,
   balanced: true,
   ...blocks,
@@ -207,7 +207,7 @@ describe("diffDepoStates", () => {
         total_placements: 900,
         total_debts: 100,
         diff: 0,
-        total_native: { tron: 100, bsc: 0.5, ethereum: 0 },
+        total_native: { tron: 100, bsc: 0.5, ethereum: 0, arbitrum: 0 },
       }),
       state({
         total_funds: 1000,
@@ -215,7 +215,7 @@ describe("diffDepoStates", () => {
         total_debts: 120,
         diff: -30,
         balanced: false,
-        total_native: { tron: 80, bsc: 0.75, ethereum: 0 },
+        total_native: { tron: 80, bsc: 0.75, ethereum: 0, arbitrum: 0 },
       }),
     );
     expect(d.delta).toEqual({
@@ -223,7 +223,7 @@ describe("diffDepoStates", () => {
       total_placements: -50,
       total_debts: 20,
       diff: -30,
-      total_native: { tron: -20, bsc: 0.25, ethereum: 0 },
+      total_native: { tron: -20, bsc: 0.25, ethereum: 0, arbitrum: 0 },
     });
     expect(d.before.balanced).toBe(true);
     expect(d.after.balanced).toBe(false);

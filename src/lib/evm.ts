@@ -1,4 +1,4 @@
-// Балансы USDT и нативной монеты (BNB/ETH) в EVM-сетях через публичный JSON-RPC.
+// Балансы USDT и нативной монеты (BNB/ETH) в EVM-сетях (BSC, Ethereum, Arbitrum) через публичный JSON-RPC.
 //
 // Никаких библиотек: оба запроса — это два готовых метода RPC. Баланс токена
 // читается вызовом balanceOf(address) через eth_call (селектор 0x70a08231),
@@ -15,11 +15,17 @@ import type { EvmChain } from "@/types";
 const DEFAULT_RPC: Record<EvmChain, string> = {
   bsc: "https://bsc-rpc.publicnode.com",
   ethereum: "https://ethereum-rpc.publicnode.com",
+  arbitrum: "https://arbitrum-one-rpc.publicnode.com",
+};
+
+const RPC_ENV: Record<EvmChain, string> = {
+  bsc: "BSC_RPC_URL",
+  ethereum: "ETH_RPC_URL",
+  arbitrum: "ARBITRUM_RPC_URL",
 };
 
 function rpcUrl(chain: EvmChain): string {
-  const override = chain === "bsc" ? process.env.BSC_RPC_URL : process.env.ETH_RPC_URL;
-  return override?.trim() || DEFAULT_RPC[chain];
+  return process.env[RPC_ENV[chain]]?.trim() || DEFAULT_RPC[chain];
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

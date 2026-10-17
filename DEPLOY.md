@@ -78,8 +78,9 @@ git push origin master
    | `TURSO_DATABASE_URL` | из шага 1 (`libsql://…`) |
    | `TURSO_AUTH_TOKEN` | из шага 1 |
    | `TRONGRID_API_KEY` | ключ TronGrid для сети TRON (опционально) |
-   | `BSC_RPC_URL` / `ETH_RPC_URL` | опционально — свои RPC для BSC/Ethereum (по умолчанию публичные ноды) |
-   | `NODEREAL_API_KEY` | ключ NodeReal MegaNode (один на обе EVM-сети) — нужен только для истории переводов в BSC/Ethereum |
+   | `BSC_RPC_URL` / `ETH_RPC_URL` / `ARBITRUM_RPC_URL` | опционально — свои RPC для BSC/Ethereum/Arbitrum (по умолчанию публичные ноды) |
+   | `NODEREAL_API_KEY` | ключ NodeReal MegaNode (один на BSC и Ethereum) — нужен только для истории переводов в BSC/Ethereum |
+   | `ETHERSCAN_API_KEY` | ключ Etherscan API v2 (бесплатный) — нужен только для истории переводов в Arbitrum |
    | `KUCOIN_API_KEY` / `KUCOIN_API_SECRET` / `KUCOIN_API_PASSPHRASE` | read-only ключ KuCoin |
    | `BITGET_API_KEY` / `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` | ключ Bitget (read-only; для вывода газа — с правом Withdraw) |
    | `EXCHANGE_PROXY_URL` | опционально — прокси со статическим IP для бирж (см. «Статический IP…» ниже) |

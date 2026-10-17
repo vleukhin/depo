@@ -6,6 +6,8 @@
 // BNB Chain взамен отключённого BscScan API; бесплатного тарифа (3M CU в сутки)
 // с запасом хватает на одного пользователя. Один ключ обслуживает и BSC, и
 // Ethereum — эндпоинт различается поддоменом (`noderealNetwork` в CHAIN_META).
+// Arbitrum сюда не попадает: nr_getTransactionByAddress у NodeReal есть только
+// для BSC и Ethereum, его история читается через Etherscan (lib/etherscan.ts).
 //
 // Метод — nr_getTransactionByAddress: адресо-центричный аналог bscscan'овского
 // `account&action=tokentx`, с курсорной пагинацией (`pageKey`) и временем блока
@@ -35,6 +37,9 @@ function apiKey(): string {
 
 function endpoint(chain: EvmChain): string {
   const network = CHAIN_META[chain].noderealNetwork;
+  if (!network) {
+    throw new Error(`NodeReal: история сети ${CHAIN_META[chain].label} не поддерживается`);
+  }
   return `https://${network}.nodereal.io/v1/${apiKey()}`;
 }
 

@@ -5,9 +5,9 @@ export type Service = (typeof SERVICES)[number];
 export type PlacementKind = "wallet" | "exchange";
 
 // Сеть записи: определяет источник баланса, формат адреса и нативную монету
-// («газ»). Список дублируется в CHECK-констрейнте placements.chain (lib/db.ts);
-// параметры сетей — в CHAIN_META (lib/chains.ts).
-export const CHAINS = ["tron", "bsc", "ethereum"] as const;
+// («газ»). Из этого списка собираются CHECK-констрейнты placements.chain и
+// native_snapshots.chain (lib/db.ts); параметры сетей — в CHAIN_META (lib/chains.ts).
+export const CHAINS = ["tron", "bsc", "ethereum", "arbitrum"] as const;
 export type Chain = (typeof CHAINS)[number];
 
 // Сети с EVM-совместимым RPC (всё, кроме TRON).

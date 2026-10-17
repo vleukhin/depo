@@ -3,14 +3,16 @@ import { CHAIN_META } from "@/lib/chains";
 import type { Chain } from "@/types";
 
 /**
- * Иконка нативной монеты сети: TRX (TRON), BNB (BSC) или ETH (Ethereum).
+ * Иконка нативной монеты сети: TRX (TRON), BNB (BSC), ETH (Ethereum). У Arbitrum
+ * газ тоже ETH, но иконка — знак сети: иначе в колонке газа и в строке перевода
+ * его ETH не отличить от ETH Ethereum.
  * `label` перекрывает подпись для читалок — та же монета обозначает и саму
  * сеть (в строке перевода она стоит рядом с суммой в USDT, а не с балансом газа).
  */
 export function NativeIcon({
   chain,
   className,
-  label = CHAIN_META[chain].native,
+  label = CHAIN_META[chain].gasLabel,
 }: {
   chain: Chain;
   className?: string;
@@ -56,6 +58,19 @@ export function NativeIcon({
     );
   }
 
+  if (chain === "arbitrum") {
+    // Arbitrum: тёмно-синий круг с голубой «A» в белой огранке.
+    return (
+      <svg {...common}>
+        <circle cx="16" cy="16" r="16" fill="#213147" />
+        <path fill="#fff" d="M16 5.2l9.35 5.4v10.8L16 26.8l-9.35-5.4V10.6L16 5.2z" opacity=".18" />
+        <path fill="#12AAFF" d="M17.3 9.6h2.25l4.3 11.8-1.9 1.1-4.65-12.9z" />
+        <path fill="#fff" d="M14.7 9.6h-2.25l-4.3 11.8 1.9 1.1 4.65-12.9z" />
+        <path fill="#12AAFF" d="M15.1 14.9l1.15-3.2 3.65 10.1-2 1.15-2.8-8.05z" />
+      </svg>
+    );
+  }
+
   // TRX: красная монета с белым фирменным знаком.
   return (
     <svg {...common}>
@@ -68,7 +83,7 @@ export function NativeIcon({
   );
 }
 
-// TRX показываем целыми, а для BNB и ETH сохраняем дробную часть: округление
+// TRX показываем целыми, а для BNB и ETH (обеих сетей) сохраняем дробную часть: округление
 // до целых превратило бы, например, 0.05 ETH в «0».
 const formatters = [0, 2, 4].map(
   (digits) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: digits }),
@@ -97,7 +112,7 @@ export function GasAmount({
   return (
     <span
       className={cn("inline-flex items-center gap-1 tabular-nums", className)}
-      title={CHAIN_META[chain].native}
+      title={CHAIN_META[chain].gasLabel}
     >
       {formatGas(chain, value)}
       <NativeIcon chain={chain} className={cn("size-3.5 shrink-0", iconClassName)} />

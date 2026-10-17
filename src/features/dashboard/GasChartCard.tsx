@@ -75,7 +75,7 @@ export function GasChartCard() {
           Динамика газа
         </CardTitle>
         <CardDescription className="hidden pl-6 md:block">
-          Суммарный {CHAIN_META[chain].native} на конец дня
+          Суммарный {CHAIN_META[chain].gasLabel} на конец дня
         </CardDescription>
         {/* Переключатели нужны только в развёрнутой карточке; клик по ним не схлопывает её. */}
         {!collapsed && (
@@ -87,7 +87,7 @@ export function GasChartCard() {
                 variant={c === chain ? "secondary" : "ghost"}
                 onClick={() => setChain(c)}
               >
-                {CHAIN_META[c].native}
+                {CHAIN_META[c].gasLabel}
               </Button>
             ))}
             <span aria-hidden className="w-2" />

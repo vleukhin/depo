@@ -1,12 +1,14 @@
 // Единая точка входа для истории переводов USDT: TRON читается через TronGrid,
-// EVM-сети — через NodeReal MegaNode. Контракт страницы общий
-// (UsdtTransfersPage), курсор непрозрачный: у TRON это fingerprint,
-// у EVM — pageKey NodeReal.
+// BSC и Ethereum — через NodeReal MegaNode, Arbitrum — через Etherscan v2
+// (источник задаёт CHAIN_META[chain].history). Контракт страницы общий
+// (UsdtTransfersPage), курсор непрозрачный: у TRON это fingerprint, у NodeReal —
+// pageKey, у Etherscan — номер страницы.
 
-import { isEvmChain } from "@/lib/chains";
+import { CHAIN_META, isEvmChain } from "@/lib/chains";
+import * as etherscan from "@/lib/etherscan";
 import * as nodereal from "@/lib/nodereal";
 import * as tron from "@/lib/tron";
-import type { Chain, UsdtTransfer, UsdtTransfersPage } from "@/types";
+import type { Chain, EvmChain, UsdtTransfer, UsdtTransfersPage } from "@/types";
 
 /**
  * Порог «пыли»: переводы меньше цента — это address poisoning (нулевые
@@ -18,6 +20,11 @@ const DUST_THRESHOLD = 0.01;
 
 const notDust = (t: UsdtTransfer) => t.amount >= DUST_THRESHOLD;
 
+/** Клиент истории EVM-сети: у обоих одинаковая пара функций. */
+function evmClient(chain: EvmChain): typeof nodereal | typeof etherscan {
+  return CHAIN_META[chain].history === "etherscan" ? etherscan : nodereal;
+}
+
 /** Страница переводов USDT по адресу кошелька, свежие сверху. */
 export async function fetchUsdtTransfers(
   chain: Chain,
@@ -25,9 +32,9 @@ export async function fetchUsdtTransfers(
   query: { limit?: number; cursor?: string } = {},
 ): Promise<UsdtTransfersPage> {
   // Курсор не трогаем: фильтр может укоротить страницу, но не сбивает пагинацию.
-  const page = await (isEvmChain(chain)
-    ? nodereal.fetchUsdtTransfers(chain, address, { limit: query.limit, page: query.cursor })
-    : tron.fetchUsdtTransfers(address, { limit: query.limit, fingerprint: query.cursor }));
+  const page = await (!isEvmChain(chain)
+    ? tron.fetchUsdtTransfers(address, { limit: query.limit, fingerprint: query.cursor })
+    : evmClient(chain).fetchUsdtTransfers(chain, address, { limit: query.limit, page: query.cursor }));
   return { ...page, transfers: page.transfers.filter(notDust) };
 }
 
@@ -38,17 +45,19 @@ export async function fetchUsdtTransfersInRange(
   from: number,
   to: number,
 ): Promise<{ transfers: UsdtTransfer[]; truncated: boolean }> {
-  const res = await (isEvmChain(chain)
-    ? nodereal.fetchUsdtTransfersInRange(chain, address, from, to)
-    : tron.fetchUsdtTransfersInRange(address, from, to));
+  const res = await (!isEvmChain(chain)
+    ? tron.fetchUsdtTransfersInRange(address, from, to)
+    : evmClient(chain).fetchUsdtTransfersInRange(chain, address, from, to));
   return { ...res, transfers: res.transfers.filter(notDust) };
 }
 
 /**
  * Пауза между запросами истории по разным кошелькам: у TronGrid без ключа
- * жёсткий лимит, у NodeReal на бесплатном тарифе — ограничение по CUPS.
+ * жёсткий лимит, у NodeReal на бесплатном тарифе — ограничение по CUPS, у
+ * Etherscan — 3 запроса в секунду.
  */
 export function historyRequestPause(chain: Chain): number {
+  if (CHAIN_META[chain].history === "etherscan") return 400;
   if (isEvmChain(chain)) return 250;
   return process.env.TRONGRID_API_KEY ? 100 : 600;
 }

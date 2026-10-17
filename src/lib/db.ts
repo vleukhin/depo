@@ -1,5 +1,6 @@
 import { createClient, type Client } from "@libsql/client";
 import { join } from "node:path";
+import { CHAINS } from "@/types";
 
 // Клиент libSQL. В проде — Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN),
 // в разработке — локальный файл SQLite (file:./data/depo.db).
@@ -56,7 +57,7 @@ async function migrate(db: Client) {
     db,
     "placements",
     "chain",
-    "TEXT NOT NULL DEFAULT 'tron' CHECK (chain IN ('tron','bsc','ethereum'))",
+    `TEXT NOT NULL DEFAULT 'tron' ${CHAIN_CHECK}`,
     { backfillFromId: false },
   );
   // Нативный баланс стал мультисетевым: TRX -> монета своей сети (micro-единицы).
@@ -136,6 +137,72 @@ async function migrate(db: Client) {
     "INSERT OR IGNORE INTO native_snapshots (date, chain, amount) " +
       "SELECT date, 'tron', trx_amount FROM trx_snapshots",
   );
+  // Новая сеть в CHAINS (последней — Arbitrum): CHECK по колонке chain устарел.
+  // Идёт последним, когда все колонки placements уже на месте.
+  await rebuildIfChainCheckStale(db, "placements", placementsTable);
+  await rebuildIfChainCheckStale(db, "native_snapshots", nativeSnapshotsTable);
+}
+
+/**
+ * Пересобирает таблицу, если её CHECK по сетям не совпадает с текущим CHAIN_CHECK:
+ * ALTER в SQLite констрейнт не меняет, поэтому — рецепт «новая таблица, копия
+ * данных, DROP старой, RENAME новой» из документации SQLite. Порядок важен:
+ * переименовывать старую таблицу нельзя, иначе SQLite перепишет на её новое имя
+ * внешние ключи debts и placement_tags.
+ *
+ * Копия, DROP и RENAME идут одной транзакцией через client.migrate() — она
+ * выключает внешние ключи. Без этого DROP placements сработал бы как удаление
+ * всех строк: ON DELETE CASCADE снял бы все теги, ON DELETE SET NULL отвязал бы
+ * все долги. Счётчик AUTOINCREMENT переносится, чтобы id жёстко удалённых
+ * записей не выдались повторно (снимки депо сопоставляют записи по id).
+ */
+async function rebuildIfChainCheckStale(
+  db: Client,
+  table: string,
+  ddl: (name: string) => string,
+) {
+  const master = await db.execute({
+    sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+    args: [table],
+  });
+  const current = master.rows[0]?.sql;
+  if (typeof current !== "string" || current.includes(CHAIN_CHECK)) return;
+
+  const tmp = `${table}__rebuild`;
+  // Остаток неудачной прошлой попытки (migrate откатывается целиком, а
+  // CREATE ниже выполняется вне его транзакции).
+  await db.execute(`DROP TABLE IF EXISTS ${tmp}`);
+  await db.execute(ddl(tmp));
+  const oldColumns = await columnNames(db, table);
+  const columns = [...(await columnNames(db, tmp))].filter((c) => oldColumns.has(c)).join(", ");
+
+  const seq = await db.execute({
+    sql: "SELECT seq FROM sqlite_master m JOIN sqlite_sequence s ON s.name = m.name WHERE m.name = ?",
+    args: [table],
+  });
+  const oldSeq = seq.rows[0]?.seq;
+
+  await db.migrate([
+    `INSERT INTO ${tmp} (${columns}) SELECT ${columns} FROM ${table}`,
+    `DROP TABLE ${table}`,
+    `ALTER TABLE ${tmp} RENAME TO ${table}`,
+    ...(typeof oldSeq === "number"
+      ? [
+          {
+            sql: "UPDATE sqlite_sequence SET seq = max(seq, ?) WHERE name = ?",
+            args: [oldSeq, table],
+          },
+          {
+            sql:
+              "INSERT INTO sqlite_sequence (name, seq) SELECT ?, ? " +
+              "WHERE NOT EXISTS (SELECT 1 FROM sqlite_sequence WHERE name = ?)",
+            args: [table, oldSeq, table],
+          },
+        ]
+      : []),
+  ]);
+  // Локальный драйвер оставляет внешние ключи выключенными после migrate().
+  await db.execute("PRAGMA foreign_keys = ON");
 }
 
 async function columnNames(db: Client, table: string): Promise<Set<string>> {
@@ -173,23 +240,20 @@ async function ensureColumn(
   }
 }
 
-// Схема встроена в модуль (а не читается из отдельного .sql-файла), чтобы работать
-// в serverless-сборке, где произвольный файл может не попасть в бандл. Суммы — micro-USDT.
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS funds (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  name       TEXT    NOT NULL,
-  amount     INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
-);
+// CHECK-констрейнт колонки chain собирается из CHAINS, чтобы список сетей жил в
+// одном месте. Строка сравнивается с текстом схемы в sqlite_master (см.
+// rebuildIfChainCheckStale), поэтому её формат менять нельзя без пересборки.
+const CHAIN_CHECK = `CHECK (chain IN (${CHAINS.map((c) => `'${c}'`).join(",")}))`;
 
-CREATE TABLE IF NOT EXISTS placements (
+// Таблицы с колонкой chain описаны функциями от имени: та же DDL нужна для
+// пересборки под новым именем, когда в CHECK появляется новая сеть.
+const placementsTable = (name: string) => `
+CREATE TABLE IF NOT EXISTS ${name} (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   name       TEXT    NOT NULL,
   amount     INTEGER NOT NULL DEFAULT 0,
   kind       TEXT    NOT NULL DEFAULT 'wallet' CHECK (kind IN ('wallet','exchange')),
-  chain      TEXT    NOT NULL DEFAULT 'tron' CHECK (chain IN ('tron','bsc','ethereum')),
+  chain      TEXT    NOT NULL DEFAULT 'tron' ${CHAIN_CHECK},
   address    TEXT,
   exchange   TEXT    CHECK (exchange IS NULL OR exchange IN ('KuCoin','Bitget')),
   exchange_account TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main')),
@@ -201,7 +265,30 @@ CREATE TABLE IF NOT EXISTS placements (
   deleted_at TEXT,
   created_at TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);`;
+
+const nativeSnapshotsTable = (name: string) => `
+CREATE TABLE IF NOT EXISTS ${name} (
+  date       TEXT NOT NULL,
+  chain      TEXT NOT NULL ${CHAIN_CHECK},
+  amount     INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (date, chain)
+);`;
+
+// Схема встроена в модуль (а не читается из отдельного .sql-файла), чтобы работать
+// в serverless-сборке, где произвольный файл может не попасть в бандл. Суммы — micro-USDT.
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS funds (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT    NOT NULL,
+  amount     INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+${placementsTable("placements")}
 
 CREATE TABLE IF NOT EXISTS managers (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,14 +319,7 @@ CREATE TABLE IF NOT EXISTS debts (
 -- Ежедневные снимки суммарного газа по каждой сети. Сумма — micro-единицы
 -- монеты (SUN у TRX; у 18-значных BNB/ETH баланс округляется до 6 знаков).
 -- date — календарный день по МСК (UTC+3 без перехода на летнее время).
-CREATE TABLE IF NOT EXISTS native_snapshots (
-  date       TEXT NOT NULL,
-  chain      TEXT NOT NULL CHECK (chain IN ('tron','bsc','ethereum')),
-  amount     INTEGER NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (date, chain)
-);
+${nativeSnapshotsTable("native_snapshots")}
 
 -- Устарела: единственный источник разовой миграции истории TRX в native_snapshots.
 -- Новые снимки сюда не пишутся; таблица остаётся как страховка на старых БД.

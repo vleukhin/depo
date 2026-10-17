@@ -37,7 +37,7 @@ function GasDelta({ chain, value }: { chain: Chain; value: number }) {
   return (
     <span className={cn("tabular-nums", deltaClass(value))}>
       {sign}
-      {formatGas(chain, Math.abs(value))} {CHAIN_META[chain].native}
+      {formatGas(chain, Math.abs(value))} {CHAIN_META[chain].gasLabel}
     </span>
   );
 }
