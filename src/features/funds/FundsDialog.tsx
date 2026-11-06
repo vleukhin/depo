@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import Link from "next/link";
+import { History, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -47,7 +48,16 @@ export function FundsDialog({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Средства</DialogTitle>
-          <DialogDescription>Из чего состоит депо</DialogDescription>
+          <DialogDescription className="flex flex-wrap items-center justify-between gap-2">
+            Из чего состоит депо
+            <Link
+              href="/funds/history"
+              className="inline-flex items-center gap-1 text-foreground/80 underline-offset-4 hover:text-foreground hover:underline"
+            >
+              <History className="size-3.5" />
+              История изменений
+            </Link>
+          </DialogDescription>
         </DialogHeader>
 
         {/* Инлайн-форма add/edit; key перемонтирует её при смене редактируемой строки. */}

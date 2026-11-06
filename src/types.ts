@@ -61,6 +61,21 @@ export interface Fund {
   updated_at: string;
 }
 
+// Запись журнала изменений состава депо (средств). Суммы — десятичные USDT.
+export type FundChangeAction = "create" | "update" | "delete";
+export interface FundChange {
+  id: number;
+  fund_id: number; // id средства; само средство могло быть уже удалено
+  action: FundChangeAction;
+  name: string; // название после изменения (у удаления — на момент удаления)
+  prev_name: string | null; // прежнее название — только если средство переименовали
+  amount: number; // сумма после изменения (у удаления 0)
+  prev_amount: number | null; // сумма до изменения (у создания null)
+  delta: number; // amount − prev_amount (у создания — вся сумма, у удаления — минус вся)
+  total_after: number; // сумма всех средств сразу после изменения
+  created_at: string; // UTC, "YYYY-MM-DD HH:MM:SS"
+}
+
 export interface Placement {
   id: number;
   name: string;

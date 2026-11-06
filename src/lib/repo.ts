@@ -5,6 +5,8 @@ import { ARCHIVE_PAGE_SIZE, CHAINS } from "@/types";
 import type {
   ArchivePage,
   Fund,
+  FundChange,
+  FundChangeAction,
   Manager,
   Tag,
   TagColor,
@@ -125,32 +127,106 @@ export async function getFundAmountByName(name: string): Promise<number> {
   });
   return fromMicro(Number(rs.rows[0].s));
 }
+// Изменения состава депо пишутся в fund_history в той же пакетной транзакции, что и
+// сама правка: запись журнала собирается INSERT … SELECT из строки funds, поэтому
+// прежние значения и итог берутся из БД атомарно, без отдельного чтения перед правкой.
+const SUM_FUNDS = "(SELECT COALESCE(SUM(amount), 0) FROM funds)";
+
 export async function createFund(input: FundInput): Promise<Fund> {
   const db = await getClient();
-  const rs = await db.execute({
-    sql: "INSERT INTO funds (name, amount) VALUES (?, ?)",
-    args: [input.name, toMicro(input.amount)],
-  });
+  const amount = toMicro(input.amount);
+  const [ins] = await db.batch(
+    [
+      { sql: "INSERT INTO funds (name, amount) VALUES (?, ?)", args: [input.name, amount] },
+      // AUTOINCREMENT: только что вставленная строка — с наибольшим id (внутри транзакции).
+      `INSERT INTO fund_history (fund_id, action, name, amount, total_after) ` +
+        `SELECT id, 'create', name, amount, ${SUM_FUNDS} FROM funds ` +
+        `WHERE id = (SELECT MAX(id) FROM funds)`,
+    ],
+    "write",
+  );
   const row = await db.execute({
     sql: "SELECT * FROM funds WHERE id = ?",
-    args: [Number(rs.lastInsertRowid)],
+    args: [Number(ins.lastInsertRowid)],
   });
   return toFund(row.rows[0]);
 }
 export async function updateFund(id: number, input: FundInput): Promise<Fund | null> {
   const db = await getClient();
-  const rs = await db.execute({
-    sql: "UPDATE funds SET name = ?, amount = ?, updated_at = datetime('now') WHERE id = ?",
-    args: [input.name, toMicro(input.amount), id],
-  });
-  if (rs.rowsAffected === 0) return null;
+  const amount = toMicro(input.amount);
+  const [, upd] = await db.batch(
+    [
+      // Журнал — до UPDATE, пока в строке прежние значения. Пустую правку (ни название,
+      // ни сумма не изменились) не логируем. prev_name — только при переименовании.
+      {
+        sql:
+          `INSERT INTO fund_history (fund_id, action, name, prev_name, amount, prev_amount, total_after) ` +
+          `SELECT id, 'update', ?, CASE WHEN name != ? THEN name END, ?, amount, ` +
+          `${SUM_FUNDS} - amount + ? FROM funds WHERE id = ? AND (name != ? OR amount != ?)`,
+        args: [input.name, input.name, amount, amount, id, input.name, amount],
+      },
+      {
+        sql: "UPDATE funds SET name = ?, amount = ?, updated_at = datetime('now') WHERE id = ?",
+        args: [input.name, amount, id],
+      },
+    ],
+    "write",
+  );
+  if (upd.rowsAffected === 0) return null;
   const row = await db.execute({ sql: "SELECT * FROM funds WHERE id = ?", args: [id] });
   return toFund(row.rows[0]);
 }
 export async function deleteFund(id: number): Promise<boolean> {
   const db = await getClient();
-  const rs = await db.execute({ sql: "DELETE FROM funds WHERE id = ?", args: [id] });
-  return rs.rowsAffected > 0;
+  const [, del] = await db.batch(
+    [
+      {
+        sql:
+          `INSERT INTO fund_history (fund_id, action, name, amount, prev_amount, total_after) ` +
+          `SELECT id, 'delete', name, 0, amount, ${SUM_FUNDS} - amount FROM funds WHERE id = ?`,
+        args: [id],
+      },
+      { sql: "DELETE FROM funds WHERE id = ?", args: [id] },
+    ],
+    "write",
+  );
+  return del.rowsAffected > 0;
+}
+
+const toFundChange = (r: Row): FundChange => {
+  const amount = Number(r.amount);
+  const prev = r.prev_amount === null ? null : Number(r.prev_amount);
+  return {
+    id: Number(r.id),
+    fund_id: Number(r.fund_id),
+    action: r.action as FundChangeAction,
+    name: String(r.name),
+    prev_name: (r.prev_name as string | null) ?? null,
+    amount: fromMicro(amount),
+    prev_amount: prev === null ? null : fromMicro(prev),
+    // Разница — в micro, чтобы не тащить погрешность float.
+    delta: fromMicro(amount - (prev ?? 0)),
+    total_after: fromMicro(Number(r.total_after)),
+    created_at: String(r.created_at),
+  };
+};
+
+/** История изменений состава депо, новые сверху, постранично (по ARCHIVE_PAGE_SIZE). */
+export async function listFundHistory(page: number): Promise<ArchivePage<FundChange>> {
+  const db = await getClient();
+  const [rs, count] = await Promise.all([
+    db.execute({
+      sql: "SELECT * FROM fund_history ORDER BY id DESC LIMIT ? OFFSET ?",
+      args: [ARCHIVE_PAGE_SIZE, (page - 1) * ARCHIVE_PAGE_SIZE],
+    }),
+    db.execute("SELECT COUNT(*) AS c FROM fund_history"),
+  ]);
+  return {
+    items: rs.rows.map(toFundChange),
+    total: Number(count.rows[0].c),
+    page,
+    page_size: ARCHIVE_PAGE_SIZE,
+  };
 }
 
 // ================= MANAGERS =================
