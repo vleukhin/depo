@@ -288,6 +288,26 @@ CREATE TABLE IF NOT EXISTS funds (
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Журнал изменений состава депо (средств): одна строка на создание, правку или
+-- удаление средства. Пишется в одной транзакции с самой правкой (lib/repo.ts).
+-- fund_id без FK: средства удаляются жёстко, а история должна пережить удаление.
+-- name — название после изменения (у удаления — на момент удаления), prev_name —
+-- прежнее название, только если его переименовали. amount — сумма после изменения
+-- (у удаления 0), prev_amount — до (у создания NULL). total_after — сумма всех
+-- средств сразу после изменения. Суммы — micro-USDT.
+CREATE TABLE IF NOT EXISTS fund_history (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  fund_id     INTEGER NOT NULL,
+  action      TEXT    NOT NULL CHECK (action IN ('create','update','delete')),
+  name        TEXT    NOT NULL,
+  prev_name   TEXT,
+  amount      INTEGER NOT NULL,
+  prev_amount INTEGER,
+  total_after INTEGER NOT NULL,
+  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_fund_history_fund ON fund_history(fund_id);
+
 ${placementsTable("placements")}
 
 CREATE TABLE IF NOT EXISTS managers (
