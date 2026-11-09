@@ -83,6 +83,8 @@ git push origin master
    | `ETHERSCAN_API_KEY` | ключ Etherscan API v2 (бесплатный) — нужен только для истории переводов в Arbitrum |
    | `KUCOIN_API_KEY` / `KUCOIN_API_SECRET` / `KUCOIN_API_PASSPHRASE` | read-only ключ KuCoin |
    | `BITGET_API_KEY` / `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` | ключ Bitget (read-only; для вывода газа — с правом Withdraw) |
+   | `BYBIT_API_KEY` / `BYBIT_API_SECRET` | read-only ключ Bybit (HMAC); без привязки к IP истекает через 90 дней |
+   | `BYBIT_API_URL` | опционально — хост API для регионального аккаунта, напр. `https://api.bybit.eu` |
    | `EXCHANGE_PROXY_URL` | опционально — прокси со статическим IP для бирж (см. «Статический IP…» ниже) |
    | `EXCHANGE_PROXY_CA` / `EXCHANGE_PROXY_SERVERNAME` | опционально — для HTTPS-прокси с самоподписанным сертификатом |
    | `CRON_SECRET` | случайная строка (`openssl rand -hex 32`) — авторизация ежедневного снимка (см. «Ежедневный снимок депо и газа» ниже) |
@@ -99,7 +101,7 @@ git push origin master
 
 KuCoin недоступен из США, а Vercel по умолчанию выполняет функции в `iad1` (США). Поэтому
 в корне лежит `vercel.json` с `"regions": ["cdg1"]` (Париж) — функции идут из Франции, вне
-блокировки. На плане Hobby регион один для всех функций; сменить можно, отредактировав файл
+блокировки (Bybit тоже отдаёт 403 на IP из США и материкового Китая). На плане Hobby регион один для всех функций; сменить можно, отредактировав файл
 (или в Settings → Functions → Function Region) и передеплоив.
 
 ## Ежедневный снимок депо и газа (Vercel Cron)
@@ -160,11 +162,11 @@ KuCoin недоступен из США, а Vercel по умолчанию вы�
 вызовами, деплоями и регионами, поэтому «узнать IP и вписать в whitelist ключа» не выйдет.
 Для read-only проверки балансов проще всего **не ставить** IP-ограничение на ключ. Но
 право **Withdraw** на ключе Bitget (нужно для вывода газа на кошельки из приложения)
-IP-allowlist требует. Тогда пускайте биржевые запросы через свой HTTP-прокси со
+IP-allowlist требует, а ключ Bybit без привязки к IP истекает через 90 дней. Тогда пускайте биржевые запросы через свой HTTP-прокси со
 статическим IP и вписывайте IP прокси в whitelist ключа.
 
 Приложение это уже поддерживает: задайте `EXCHANGE_PROXY_URL` — и **только** запросы к
-Bitget/KuCoin пойдут через прокси (TronGrid, EVM-RPC, Etherscan, Telegram и БД Turso — напрямую, чтобы не
+Bitget/KuCoin/Bybit пойдут через прокси (TronGrid, EVM-RPC, Etherscan, Telegram и БД Turso — напрямую, чтобы не
 зависеть от аптайма прокси). Не задан — обычный прямой fetch (режим локальной разработки).
 
 Через прокси идут **подписанные** запросы с вашим API-ключом (в т.ч. с правом Withdraw),

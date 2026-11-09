@@ -37,6 +37,29 @@ export const PLACEMENT_ICON_META: Record<PlacementIconId, IconDef> = {
       </svg>
     ),
   },
+  bybit: {
+    label: "Bybit",
+    // Словомарка BYBIT (белая, «I» — фирменный оранжевый) на тёмном квадрате, как
+    // иконка приложения Bybit. textLength фиксирует ширину при любом системном шрифте.
+    svg: (cls) => (
+      <svg viewBox="0 0 40 40" role="img" aria-label="Bybit" className={cn(base, cls)}>
+        <rect width="40" height="40" rx="8.71" fill="#17181E" />
+        <text
+          x="20"
+          y="24.2"
+          textAnchor="middle"
+          textLength="32"
+          lengthAdjust="spacingAndGlyphs"
+          fontFamily="Arial, Helvetica, sans-serif"
+          fontSize="12"
+          fontWeight="800"
+          fill="#FFFFFF"
+        >
+          BYB<tspan fill="#F7A600">I</tspan>T
+        </text>
+      </svg>
+    ),
+  },
   onekey: {
     label: "OneKey",
     svg: (cls) => (

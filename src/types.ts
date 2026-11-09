@@ -13,14 +13,16 @@ export type Chain = (typeof CHAINS)[number];
 // Сети с EVM-совместимым RPC (всё, кроме TRON).
 export type EvmChain = Exclude<Chain, "tron">;
 
-export const EXCHANGES = ["KuCoin", "Bitget"] as const;
+// Биржи и иконки: из этих списков собираются CHECK-констрейнты placements.exchange
+// и placements.icon (lib/db.ts) — новая запись пересобирает таблицу в migrate().
+export const EXCHANGES = ["KuCoin", "Bitget", "Bybit"] as const;
 export type Exchange = (typeof EXCHANGES)[number];
 
 export const EXCHANGE_ACCOUNTS = ["spot", "main"] as const;
 export type ExchangeAccount = (typeof EXCHANGE_ACCOUNTS)[number];
 
 // Иконка записи — выбирается вручную в настройках. null — без иконки.
-export const PLACEMENT_ICONS = ["kucoin", "bitget", "onekey", "tangem"] as const;
+export const PLACEMENT_ICONS = ["kucoin", "bitget", "bybit", "onekey", "tangem"] as const;
 export type PlacementIconId = (typeof PLACEMENT_ICONS)[number];
 
 // Цвет тега — из фиксированной палитры (CSS-переменные --tag-* в globals.css).

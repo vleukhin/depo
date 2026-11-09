@@ -1,6 +1,6 @@
 import { createClient, type Client } from "@libsql/client";
 import { join } from "node:path";
-import { CHAINS } from "@/types";
+import { CHAINS, EXCHANGES, PLACEMENT_ICONS } from "@/types";
 
 // Клиент libSQL. В проде — Turso (TURSO_DATABASE_URL + TURSO_AUTH_TOKEN),
 // в разработке — локальный файл SQLite (file:./data/depo.db).
@@ -77,7 +77,7 @@ async function migrate(db: Client) {
     db,
     "placements",
     "exchange",
-    "TEXT CHECK (exchange IS NULL OR exchange IN ('KuCoin','Bitget'))",
+    `TEXT ${EXCHANGE_CHECK}`,
     { backfillFromId: false },
   );
   await ensureColumn(
@@ -92,7 +92,7 @@ async function migrate(db: Client) {
     db,
     "placements",
     "icon",
-    "TEXT CHECK (icon IS NULL OR icon IN ('kucoin','bitget','onekey','tangem'))",
+    `TEXT ${ICON_CHECK}`,
     { backfillFromId: false },
   );
   // Дата долга: существующие строки получают дату создания записи.
@@ -137,14 +137,20 @@ async function migrate(db: Client) {
     "INSERT OR IGNORE INTO native_snapshots (date, chain, amount) " +
       "SELECT date, 'tron', trx_amount FROM trx_snapshots",
   );
-  // Новая сеть в CHAINS (последней — Arbitrum): CHECK по колонке chain устарел.
-  // Идёт последним, когда все колонки placements уже на месте.
-  await rebuildIfChainCheckStale(db, "placements", placementsTable);
-  await rebuildIfChainCheckStale(db, "native_snapshots", nativeSnapshotsTable);
+  // Новая сеть в CHAINS (последней — Arbitrum), биржа в EXCHANGES или иконка в
+  // PLACEMENT_ICONS (последней — Bybit): CHECK по колонке устарел. Идёт последним,
+  // когда все колонки placements уже на месте.
+  await rebuildIfCheckStale(db, "placements", placementsTable, [
+    CHAIN_CHECK,
+    EXCHANGE_CHECK,
+    ICON_CHECK,
+  ]);
+  await rebuildIfCheckStale(db, "native_snapshots", nativeSnapshotsTable, [CHAIN_CHECK]);
 }
 
 /**
- * Пересобирает таблицу, если её CHECK по сетям не совпадает с текущим CHAIN_CHECK:
+ * Пересобирает таблицу, если в её DDL нет хотя бы одного из актуальных CHECK
+ * (`checks` — CHAIN_CHECK / EXCHANGE_CHECK / ICON_CHECK, собранные из списков в types.ts):
  * ALTER в SQLite констрейнт не меняет, поэтому — рецепт «новая таблица, копия
  * данных, DROP старой, RENAME новой» из документации SQLite. Порядок важен:
  * переименовывать старую таблицу нельзя, иначе SQLite перепишет на её новое имя
@@ -156,17 +162,18 @@ async function migrate(db: Client) {
  * все долги. Счётчик AUTOINCREMENT переносится, чтобы id жёстко удалённых
  * записей не выдались повторно (снимки депо сопоставляют записи по id).
  */
-async function rebuildIfChainCheckStale(
+async function rebuildIfCheckStale(
   db: Client,
   table: string,
   ddl: (name: string) => string,
+  checks: string[],
 ) {
   const master = await db.execute({
     sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
     args: [table],
   });
   const current = master.rows[0]?.sql;
-  if (typeof current !== "string" || current.includes(CHAIN_CHECK)) return;
+  if (typeof current !== "string" || checks.every((c) => current.includes(c))) return;
 
   const tmp = `${table}__rebuild`;
   // Остаток неудачной прошлой попытки (migrate откатывается целиком, а
@@ -240,10 +247,14 @@ async function ensureColumn(
   }
 }
 
-// CHECK-констрейнт колонки chain собирается из CHAINS, чтобы список сетей жил в
-// одном месте. Строка сравнивается с текстом схемы в sqlite_master (см.
-// rebuildIfChainCheckStale), поэтому её формат менять нельзя без пересборки.
-const CHAIN_CHECK = `CHECK (chain IN (${CHAINS.map((c) => `'${c}'`).join(",")}))`;
+// CHECK-констрейнты колонок chain, exchange и icon собираются из CHAINS, EXCHANGES и
+// PLACEMENT_ICONS, чтобы списки жили в одном месте. Строки сравниваются с текстом
+// схемы в sqlite_master (см. rebuildIfCheckStale), поэтому их формат менять нельзя
+// без пересборки таблиц.
+const sqlList = (values: readonly string[]) => values.map((v) => `'${v}'`).join(",");
+const CHAIN_CHECK = `CHECK (chain IN (${sqlList(CHAINS)}))`;
+const EXCHANGE_CHECK = `CHECK (exchange IS NULL OR exchange IN (${sqlList(EXCHANGES)}))`;
+const ICON_CHECK = `CHECK (icon IS NULL OR icon IN (${sqlList(PLACEMENT_ICONS)}))`;
 
 // Таблицы с колонкой chain описаны функциями от имени: та же DDL нужна для
 // пересборки под новым именем, когда в CHECK появляется новая сеть.
@@ -255,9 +266,9 @@ CREATE TABLE IF NOT EXISTS ${name} (
   kind       TEXT    NOT NULL DEFAULT 'wallet' CHECK (kind IN ('wallet','exchange')),
   chain      TEXT    NOT NULL DEFAULT 'tron' ${CHAIN_CHECK},
   address    TEXT,
-  exchange   TEXT    CHECK (exchange IS NULL OR exchange IN ('KuCoin','Bitget')),
+  exchange   TEXT    ${EXCHANGE_CHECK},
   exchange_account TEXT CHECK (exchange_account IS NULL OR exchange_account IN ('spot','main')),
-  icon       TEXT    CHECK (icon IS NULL OR icon IN ('kucoin','bitget','onekey','tangem')),
+  icon       TEXT    ${ICON_CHECK},
   comment    TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   chain_checked_at TEXT,
