@@ -9,6 +9,7 @@ import { fetchTrxBalance, fetchUsdtBalance as fetchTronUsdtBalance } from "@/lib
 import { fetchNativeBalance, fetchUsdtBalance as fetchEvmUsdtBalance } from "@/lib/evm";
 import { fetchCoinBalanceMicro as fetchKucoinCoin } from "@/lib/kucoin";
 import { fetchCoinBalanceMicro as fetchBitgetCoin } from "@/lib/bitget";
+import { fetchCoinBalanceMicro as fetchBybitCoin } from "@/lib/bybit";
 import type { Chain, CheckBalancesResult, Exchange, ExchangeAccount } from "@/types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -17,6 +18,7 @@ type ExchangeFetcher = (coin: string, account: ExchangeAccount) => Promise<numbe
 const EXCHANGE_FETCHERS: Record<Exchange, ExchangeFetcher> = {
   KuCoin: fetchKucoinCoin,
   Bitget: fetchBitgetCoin,
+  Bybit: fetchBybitCoin,
 };
 
 /**
@@ -69,7 +71,7 @@ export async function checkAllBalances(): Promise<CheckBalancesResult> {
     await sleep(walletPause(chain));
   }
 
-  // Биржи: USDT и нативная монета сети записи через приватный API (KuCoin/Bitget).
+  // Биржи: USDT и нативная монета сети записи через приватный API (KuCoin/Bitget/Bybit).
   for (const { id, name, chain, exchange, exchange_account } of await listExchangePlacements()) {
     try {
       const fetchCoin = EXCHANGE_FETCHERS[exchange];

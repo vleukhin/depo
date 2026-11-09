@@ -1,4 +1,4 @@
-// HTTP(S)-прокси со статическим IP для исходящих запросов к биржам (Bitget/KuCoin).
+// HTTP(S)-прокси со статическим IP для исходящих запросов к биржам (Bitget/KuCoin/Bybit).
 //
 // На Vercel у serverless-функций нет фиксированного исходящего IP, а право Withdraw
 // на ключе Bitget требует IP в whitelist. Задав EXCHANGE_PROXY_URL (свой прокси со
