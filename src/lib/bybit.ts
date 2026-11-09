@@ -18,7 +18,9 @@ import type { Dispatcher } from "undici";
 import { decimalToMicro } from "@/lib/money";
 import { getExchangeDispatcher } from "@/lib/proxy";
 
-const BASE_URL = process.env.BYBIT_API_URL ?? "https://api.bybit.com";
+// `||`, а не `??`: пустая переменная в env тоже значит «по умолчанию»; хвостовой
+// слэш срезаем, чтобы путь не превратился в «//v5».
+const BASE_URL = (process.env.BYBIT_API_URL || "https://api.bybit.com").replace(/\/+$/, "");
 const RECV_WINDOW = "10000"; // мс; запас на прокси и расхождение часов
 const RATE_LIMIT_CODE = 10006; // «Too many visits» — лимит приходит в теле, а не HTTP-статусом
 
@@ -138,9 +140,22 @@ export async function fetchFundCoins(coin: string): Promise<BybitFundCoin[]> {
   return result.balance ?? [];
 }
 
-/** Десятичная строка суммы -> micro; пустую строку или отсутствующее поле считаем нулём. */
-function fieldToMicro(value: string | undefined): number {
-  return value === undefined || value.trim() === "" ? 0 : decimalToMicro(value);
+/** Ошибка про отрицательный баланс монеты — маржа/заём на счёте, сверять нечего. */
+const negativeBalance = (coin: string) =>
+  new Error(`Bybit: отрицательный баланс ${coin} на едином счёте (маржа или заём)`);
+
+/**
+ * Десятичная строка суммы -> micro; пустую строку или отсутствующее поле считаем нулём.
+ * decimalToMicro знак не принимает, поэтому минус (бывает у walletBalance в UTA)
+ * разбираем отдельно — в ошибку про отрицательный баланс, а не «Некорректная сумма».
+ */
+function fieldToMicro(value: string | undefined, coin: string): number {
+  if (value === undefined || value.trim() === "") return 0;
+  if (value.trim().startsWith("-")) {
+    if (/^-0*(\.0*)?$/.test(value.trim())) return 0; // «-0», «-0.00»
+    throw negativeBalance(coin);
+  }
+  return decimalToMicro(value);
 }
 
 /**
@@ -151,6 +166,10 @@ function fieldToMicro(value: string | undefined): number {
  * `main` — Funding-счёт: `walletBalance`. `transferBalance` не берём: по
  * документации Bybit у свежих депозитов он бывает занижен, и сверка показала бы
  * недостачу. Если монеты на счёте нет — 0.
+ *
+ * Отрицательный баланс (UTA уходит в минус при марже/автозайме, или заёмное стоит
+ * в ордере) не пишем в сумму записи, а бросаем понятную ошибку: строка попадёт в
+ * `failed` проверки, прежняя сумма в БД останется.
  */
 export async function fetchCoinBalanceMicro(
   coin: string,
@@ -158,16 +177,21 @@ export async function fetchCoinBalanceMicro(
 ): Promise<number> {
   if (account === "spot") {
     const coins = await fetchUnifiedCoins(coin);
-    return coins
+    const total = coins
       .filter((c) => c.coin === coin)
       .reduce(
         (sum, c) =>
-          sum + fieldToMicro(c.walletBalance) - fieldToMicro(c.spotBorrow) - fieldToMicro(c.locked),
+          sum +
+          fieldToMicro(c.walletBalance, coin) -
+          fieldToMicro(c.spotBorrow, coin) -
+          fieldToMicro(c.locked, coin),
         0,
       );
+    if (total < 0) throw negativeBalance(coin);
+    return total;
   }
   const coins = await fetchFundCoins(coin);
   return coins
     .filter((c) => c.coin === coin)
-    .reduce((sum, c) => sum + fieldToMicro(c.walletBalance), 0);
+    .reduce((sum, c) => sum + fieldToMicro(c.walletBalance, coin), 0);
 }

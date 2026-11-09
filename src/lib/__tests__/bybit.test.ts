@@ -73,6 +73,21 @@ describe("bybit.fetchCoinBalanceMicro", () => {
     expect(url.searchParams.get("coin")).toBe("USDT");
   });
 
+  it("spot: отрицательный баланс — понятная ошибка, а не отрицательная сумма", async () => {
+    fetchMock.mockResolvedValueOnce(unified([{ coin: "USDT", walletBalance: "-12.3", locked: "0" }]));
+    await expect(fetchCoinBalanceMicro("USDT", "spot")).rejects.toThrow(
+      "Bybit: отрицательный баланс USDT на едином счёте (маржа или заём)",
+    );
+    // заёмное стоит в ордере: 100 − 100 − 100 < 0
+    fetchMock.mockResolvedValueOnce(
+      unified([{ coin: "USDT", walletBalance: "100", spotBorrow: "100", locked: "100" }]),
+    );
+    await expect(fetchCoinBalanceMicro("USDT", "spot")).rejects.toThrow(/отрицательный баланс/);
+    // «-0» — это ноль
+    fetchMock.mockResolvedValueOnce(unified([{ coin: "USDT", walletBalance: "-0", locked: "" }]));
+    expect(await fetchCoinBalanceMicro("USDT", "spot")).toBe(0);
+  });
+
   it("прикладная ошибка из retCode превращается в исключение с сообщением биржи", async () => {
     fetchMock.mockResolvedValueOnce(fail(10003, "API key is invalid."));
     await expect(fetchCoinBalanceMicro("USDT", "main")).rejects.toThrow("Bybit: API key is invalid.");
